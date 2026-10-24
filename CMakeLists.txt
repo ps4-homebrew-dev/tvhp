@@ -99,7 +99,7 @@ if(ORBIS)
                          -s48 CONTENT_ID=${CONTENT_ID}
                          -s8 APP_VER=${VERSION}
                          -s8 VERSION=${VERSION}
-                         -i ATTRIBUTE=0
+                         -i ATTRIBUTE=2
                          -i DOWNLOAD_DATA_SIZE=0
                          -i SYSTEM_VER=0
                          -s4 CATEGORY=gdc
