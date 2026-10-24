@@ -81,7 +81,8 @@ if(ORBIS)
         libvulkan.so.1
     )
 
-    set(PKG_FILES eboot.bin sce_sys/param.sfo sce_sys/icon0.png)
+    set(PKG_FILES eboot.bin sce_sys/param.sfo
+                  sce_sys/icon0.png sce_sys/pic0.png sce_sys/pic1.png)
     set(PKG_OUTPUTS)
 
     add_custom_command(
@@ -107,29 +108,19 @@ if(ORBIS)
         VERBATIM
     )
 
-    # The PS4 wants a 512x512 icon; sce_sys/icon0.png is scaled to fit.
-    add_custom_command(
-        OUTPUT ${PKG_DIR}/sce_sys/icon0.png
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${PKG_DIR}/sce_sys
-        COMMAND convert ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png
-                -resize 512x512 -background black -gravity center
-                -extent 512x512 ${PKG_DIR}/sce_sys/icon0.png
-        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/icon0.png
-        VERBATIM
-    )
-
-    # Backgrounds, already 1920x1080: pic0 behind the app's start screen,
-    # pic1 behind the home screen while the tile is focused.
-    foreach(pic pic0.png pic1.png)
+    # The icon (512x512) and backgrounds (1920x1080) are committed at the
+    # sizes the PS4 wants, so they are copied as-is: pic0 is shown behind
+    # the app's start screen, pic1 behind the home screen while the tile
+    # is focused.
+    foreach(img icon0.png pic0.png pic1.png)
         add_custom_command(
-            OUTPUT ${PKG_DIR}/sce_sys/${pic}
+            OUTPUT ${PKG_DIR}/sce_sys/${img}
             COMMAND ${CMAKE_COMMAND} -E make_directory ${PKG_DIR}/sce_sys
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/${pic}
-                    ${PKG_DIR}/sce_sys/${pic}
-            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/${pic}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/${img}
+                    ${PKG_DIR}/sce_sys/${img}
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/${img}
         )
-        list(APPEND PKG_FILES sce_sys/${pic})
     endforeach()
 
     # Mesa: libGL.so.1 is what RmlUi's GL loader opens.
