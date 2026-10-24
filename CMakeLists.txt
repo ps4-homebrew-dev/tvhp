@@ -118,6 +118,20 @@ if(ORBIS)
         VERBATIM
     )
 
+    # Backgrounds, already 1920x1080: pic0 behind the app's start screen,
+    # pic1 behind the home screen while the tile is focused.
+    foreach(pic pic0.png pic1.png)
+        add_custom_command(
+            OUTPUT ${PKG_DIR}/sce_sys/${pic}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${PKG_DIR}/sce_sys
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/${pic}
+                    ${PKG_DIR}/sce_sys/${pic}
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/sce_sys/${pic}
+        )
+        list(APPEND PKG_FILES sce_sys/${pic})
+    endforeach()
+
     # Mesa: libGL.so.1 is what RmlUi's GL loader opens.
     foreach(module ${MESA_MODULES})
         add_custom_command(
