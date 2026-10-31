@@ -22,8 +22,9 @@ public:
   ~App() override;
 
   struct Options {
-    std::string assets_dir = "assets"; // main.rml and what it loads
-    std::string config_path = "tvhp.cfg"; // the saved servers
+    std::string config_path = "tvhp.cfg";
+    std::string assets_dir = "assets";
+    std::string fonts_dir = "fonts";
   };
 
   // Creates the data model and loads main.rml from the assets. Must be

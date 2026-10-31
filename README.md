@@ -67,7 +67,8 @@ Download `IV0000-BREW04328_00-TVHP000000000000.pkg` from the
 [releases page][releases] (or build it, below) and install it with your
 package installer. `TVHP` then appears on the home screen.
 
-The saved servers are kept in `/data/tvhp/tvhp.cfg`.
+The saved servers are kept for each user, in `tvhp/tvhp.cfg` under the user's
+folder in `$XDG_CONFIG_HOME` (the title's temporary data, `/temp0`).
 
 [releases]: ../../releases
 

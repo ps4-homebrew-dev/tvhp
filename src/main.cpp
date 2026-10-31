@@ -6,6 +6,10 @@
 #include <string>
 #include <sys/stat.h>
 
+// Makes main() SDL_main() on a PS4, where SDL2main sets up the XDG
+// directories, hides the splash screen, and exits to the home screen.
+#include <SDL.h>
+
 #include <RmlUi/Core.h>
 
 #include "RmlUi/RmlUi_Backend.h"
@@ -15,67 +19,35 @@
 #define SCREEN_HEIGHT 1080
 
 
-typedef struct SceAppContentInitParam {
-  char reserved[32];
-} SceAppContentInitParam;
-
-typedef struct SceAppContentBootParam {
-  char     reserved1[4];
-  uint32_t attr;
-  char     reserved2[32];
-} SceAppContentBootParam;
-
-typedef struct SceAppContentMountPoint {
-  char data[16];
-} SceAppContentMountPoint;
-
-
-extern "C" {
-  int sceSystemServiceLoadExec(const char* path, char* const argv[]);
-  int sceAppContentInitialize(const SceAppContentInitParam *initParam,
-			      SceAppContentBootParam *bootParam);
-  int sceAppContentTemporaryDataMount2(uint32_t option, SceAppContentMountPoint *mountPoint);
-  int sceAppContentTemporaryDataUnmount(const SceAppContentMountPoint *mountPoint);
-  int sceSysmoduleLoadModule(uint64_t);
-}
-
-#if defined(__ORBIS__)
-static SceAppContentMountPoint  g_tmpmnt = {0};
-
-__attribute__((constructor))
-static void OrbisInit(void) {
-  SceAppContentInitParam ip = {};
-  SceAppContentBootParam bp = {};
-
-  sceSysmoduleLoadModule(0x00b4);
-  sceAppContentInitialize(&ip, &bp);
-  sceAppContentTemporaryDataMount2(0, &g_tmpmnt);
-}
-#endif
-
-
 static void PrintUsage(const char* argv0) {
   std::printf(
     "Usage: %s [options]\n"
     "  -a, --assets DIR   RML documents, stylesheets and icons (default: ./assets)\n"
     "  -f, --fonts DIR    fonts (default: ./fonts)\n"
-    "  -c, --config FILE  saved servers (default: ./tvhp.cfg)\n"
+    "  -c, --config FILE  saved servers (default: ./tvhp.cfg, or the\n"
+    "                     preference folder of the user on a PS4)\n"
     "  -h, --help         this text\n",
     argv0);
 }
 
-static int Run(int argc, char* argv[]) {
+extern "C" int SDL_main(int argc, char* argv[]) {
   App::Options options;
-  std::string fonts_dir;
 
-#if defined(__ORBIS__)
+#if defined(__SCE__)
   options.assets_dir = "/app0/assets";
-  fonts_dir = "/app0/fonts";
-  options.config_path = "/temp0/tvhp.cfg";
+  options.fonts_dir = "/app0/fonts";
+
+  // The saved servers are kept for each user.
+  if (char* pref = SDL_GetPrefPath("", "tvhp")) {
+    options.config_path = std::string(pref) + "tvhp.cfg";
+    SDL_free(pref);
+  } else {
+    std::fprintf(stderr, "No folder for the saved servers: %s\n", SDL_GetError());
+  }
 #else
   const std::string cwd = std::filesystem::current_path();
   options.assets_dir = cwd + "/assets";
-  fonts_dir = cwd + "/fonts";
+  options.fonts_dir = cwd + "/fonts";
 #endif
 
   for (int i = 1; i < argc; i++) {
@@ -88,7 +60,7 @@ static int Run(int argc, char* argv[]) {
     } else if (arg("-a", "--assets") && i + 1 < argc) {
       options.assets_dir = argv[++i];
     } else if (arg("-f", "--fonts") && i + 1 < argc) {
-      fonts_dir = argv[++i];
+      options.fonts_dir = argv[++i];
     } else if (arg("-c", "--config") && i + 1 < argc) {
       options.config_path = argv[++i];
     } else {
@@ -118,11 +90,11 @@ static int Run(int argc, char* argv[]) {
     return -1;
   }
 
-  Rml::LoadFontFace(fonts_dir + "/LatoLatin-Bold.ttf", false);
-  Rml::LoadFontFace(fonts_dir + "/LatoLatin-BoldItalic.ttf", false);
-  Rml::LoadFontFace(fonts_dir + "/LatoLatin-Italic.ttf", false);
-  Rml::LoadFontFace(fonts_dir + "/LatoLatin-Regular.ttf", false);
-  Rml::LoadFontFace(fonts_dir + "/NotoEmoji-VariableFont_wght.ttf", true);
+  Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Bold.ttf", false);
+  Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-BoldItalic.ttf", false);
+  Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Italic.ttf", false);
+  Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Regular.ttf", false);
+  Rml::LoadFontFace(options.fonts_dir + "/NotoEmoji-VariableFont_wght.ttf", true);
 
   if (!app.Initialize(ctx, options, err)) {
     Rml::Log::Message(Rml::Log::LT_ERROR, "Failed to initialize app: %s", err.c_str());
@@ -149,14 +121,8 @@ static int Run(int argc, char* argv[]) {
   return 0;
 }
 
+#if defined(__linux__)
 int main(int argc, char* argv[]) {
-  const int status = Run(argc, argv);
-#if defined(__ORBIS__)
-  // A PS4 process that returns from main() is reported as a crash; asking
-  // the system to close the title is the clean way out.
-  sceSystemServiceLoadExec("exit", nullptr);
-#endif
-  return status;
+  return SDL_main(argc, argv);
 }
-
-
+#endif

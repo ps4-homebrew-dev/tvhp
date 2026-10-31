@@ -21,7 +21,7 @@ struct ServerProfile {
 };
 
 // The list of saved servers, persisted to tvhp.cfg (in the working directory
-// on a PC, /data/tvhp/tvhp.cfg on a PS4).
+// on a PC, in the preference folder of the user on a PS4).
 //
 // File format (the old single-server format, a flat list of host=/port=/
 // user=/pass= lines, is still read and silently migrated on the next save):
