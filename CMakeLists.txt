@@ -11,7 +11,6 @@ find_package(Threads REQUIRED)
 
 pkg_check_modules(FREETYPE2 REQUIRED IMPORTED_TARGET freetype2)
 pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
-# libavformat's MPEG-TS muxer puts live TV back into a container for mpv.
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil)
 pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
 
