@@ -102,7 +102,8 @@ private:
   void SetConnectZone(Zone zone);
   int CurrentFormRow(bool* in_input) const;
   void FocusFormField(int delta);  // up/down: label -> label, input -> input
-  // Focuses a row's text field, emptied (the PS4 keyboard can only append).
+  // Focuses a row's text field with its text selected, so what the PS4
+  // keyboard types replaces it (the keyboard can only append).
   bool EnterFormInput(int row);
   bool FocusFormInput();  // right: label -> input
   bool FocusFormLabel();  // left: input -> label (only at caret start)

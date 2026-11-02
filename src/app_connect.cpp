@@ -270,34 +270,24 @@ int App::CurrentFormRow(bool* in_input) const
   return 0;
 }
 
-// Focuses the text field of a form row, emptied. The PS4's own keyboard adds
-// what is typed to the text already in the field and has no way to delete
-// any of it, so a field starts blank whenever it is entered. The bound value
-// is cleared along with the element, so the two cannot disagree if the
-// keyboard is dismissed without typing anything.
+// Focuses the text field of a form row with all of its text selected. The
+// PS4's own keyboard adds what is typed to the text already in the field and
+// has no way to delete any of it; with the text selected, what is typed
+// replaces it instead. Nothing is removed until something is typed, so
+// dismissing the keyboard leaves the field as it was.
 bool App::EnterFormInput(int row)
 {
-  Rml::String* value = nullptr;
-  const char* variable = nullptr;
-  switch (row)
-    {
-    case 0: value = &cfg_name_; variable = "name"; break;
-    case 1: value = &cfg_host_; variable = "host"; break;
-    case 2: value = &cfg_port_; variable = "port"; break;
-    case 3: value = &cfg_user_; variable = "user"; break;
-    case 4: value = &cfg_pass_; variable = "pass"; break;
-    default: return false; // the button row has no text field
-    }
+  if (row < 0 || row >= kButtonRow)
+    return false; // the button row has no text field
 
   Rml::Element* el = document_->GetElementById(kFormRows[row].input);
   if (!el)
     return false;
 
-  value->clear();
-  model_.DirtyVariable(variable);
-  if (auto* input = dynamic_cast<Rml::ElementFormControlInput*>(el))
-    input->SetValue("");
   el->Focus();
+  // After the focus: gaining it may place the caret and drop a selection.
+  if (auto* input = dynamic_cast<Rml::ElementFormControlInput*>(el))
+    input->Select();
   return true;
 }
 
@@ -313,7 +303,7 @@ void App::FocusFormField(int delta)
   if (in_input && current != kButtonRow)
     {
       if (next == current)
-	return; // first field and up: stay put, rather than re-enter (and empty) it
+	return; // first field and up: stay put
       if (next != kButtonRow)
 	{
 	  EnterFormInput(next);
@@ -338,7 +328,7 @@ bool App::FocusFormInput()
   if (row != kButtonRow)
     return EnterFormInput(row);
 
-  // Save -> Cancel: a button, so there is nothing to empty.
+  // Save -> Cancel: a button, so there is no text to select.
   if (Rml::Element* el = document_->GetElementById(kFormRows[row].input))
     {
       el->Focus();
