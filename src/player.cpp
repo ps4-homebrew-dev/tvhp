@@ -207,13 +207,9 @@ bool Player::Initialize(std::string& error) {
   // them (the built-in Lua scripts differ between versions; none is wanted).
   struct Option { const char* name; const char* value; bool quiet; };
   static const Option options[] = {
-    // Bilinear scaling, no dithering, no LUT-based scalers: what the PS4's
-    // GPU affords at 1080p next to the UI.
     {"profile", "fast", false},
     {"vo", "libmpv", false},
     {"idle", "yes", false},
-    // A recording that has played to its end stays on its last frame,
-    // paused, as does a live channel whose stream the server stopped.
     {"keep-open", "yes", false},
     {"terminal", "no", false},
     {"config", "no", false},
@@ -233,13 +229,9 @@ bool Player::Initialize(std::string& error) {
     {"osd-level", "0", false},
     {"hwdec", "no", false},
     {"audio-display", "no", false},
-    // DVB subtitles and teletext aren't muxed; nothing else is wanted.
     {"sid", "no", false},
-#if defined(__ORBIS__)
-    // The demuxer cache comes out of the same pool as the GPU's memory.
     {"demuxer-max-bytes", "64MiB", false},
     {"demuxer-max-back-bytes", "16MiB", false},
-#endif
   };
   for (const Option& o : options) {
     const int rc = mpv_set_option_string(mpv_, o.name, o.value);
