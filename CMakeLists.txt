@@ -64,7 +64,7 @@ if(ORBIS)
     pkg_check_modules(VULKAN REQUIRED vulkan)
 
     orbis_add_pkg(tvhp
-        TITLE TVHP
+        TITLE tvhp
         TITLE_ID BREW04328
         ASSETS sce_sys assets fonts
         MODULES libEGL.so.1 libGL.so.1 libgallium-${EGL_VERSION}.so libvulkan.so.1
