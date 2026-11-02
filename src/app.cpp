@@ -12,6 +12,19 @@
 
 using namespace appdetail;
 
+namespace {
+
+// The row 'delta' steps from 'current' in a list of 'count' rows (count > 0).
+// A single step past either end wraps round to the other; bigger jumps (the
+// shoulder buttons, home and end) stop at the end instead.
+int StepIndex(int current, int delta, int count)
+{
+  if (delta == 1 || delta == -1)
+    return ((current + delta) % count + count) % count;
+  return std::clamp(current + delta, 0, count - 1);
+}
+
+} // namespace
 
 App::App() : player_(std::make_unique<Player>()) {}
 
@@ -439,7 +452,7 @@ void App::MoveSelection(int delta)
       {
 	if (server_rows_.empty())
 	  return;
-	const int next = std::clamp(sel_server_ + delta, 0, (int)server_rows_.size() - 1);
+	const int next = StepIndex(sel_server_, delta, (int)server_rows_.size());
 	if (next == sel_server_)
 	  return;
 	sel_server_ = next;
@@ -452,7 +465,7 @@ void App::MoveSelection(int delta)
       {
 	if (channel_rows_.empty())
 	  return;
-	const int next = std::clamp(sel_channel_ + delta, 0, (int)channel_rows_.size() - 1);
+	const int next = StepIndex(sel_channel_, delta, (int)channel_rows_.size());
 	if (next == sel_channel_)
 	  return;
 	sel_channel_ = next;
@@ -467,7 +480,7 @@ void App::MoveSelection(int delta)
       {
 	if (epg_rows_.empty())
 	  return;
-	const int next = std::clamp(sel_epg_ + delta, 0, (int)epg_rows_.size() - 1);
+	const int next = StepIndex(sel_epg_, delta, (int)epg_rows_.size());
 	if (next == sel_epg_)
 	  return;
 	sel_epg_ = next;
@@ -480,7 +493,7 @@ void App::MoveSelection(int delta)
       {
 	if (rec_rows_.empty())
 	  return;
-	const int next = std::clamp(sel_rec_ + delta, 0, (int)rec_rows_.size() - 1);
+	const int next = StepIndex(sel_rec_, delta, (int)rec_rows_.size());
 	if (next == sel_rec_)
 	  return;
 	sel_rec_ = next;

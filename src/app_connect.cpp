@@ -15,9 +15,10 @@ namespace {
   // Connect view form rows: label on the left, input on the right. The last
   // row is the Save/Cancel button pair: Save sits in the label slot and
   // Cancel in the input slot, so left/right moves between the two buttons.
-  // Up/down walks the rows and always lands on the label/button, so focus
-  // never enters an <input> - and SDL never starts text input - unless the
-  // user presses right on a row.
+  // Up/down from a label or button walks the labels/buttons, so focus does
+  // not enter an <input> - and SDL does not start text input - unless the
+  // user presses right on a row. From inside an <input>, up/down goes to the
+  // next <input> instead, so a form can be filled in field after field.
   struct FormRow { const char* label; const char* input; };
   constexpr FormRow kFormRows[] = {
     {"lbl-name", "in-name"},
@@ -28,6 +29,8 @@ namespace {
     {"btn-save", "btn-cancel"},
   };
   constexpr int kFormRowCount = (int)(sizeof(kFormRows) / sizeof(kFormRows[0]));
+  // The Save/Cancel row: its "input" is a button, not a text field.
+  constexpr int kButtonRow = kFormRowCount - 1;
 }
 
 void App::RebuildServerRows() {
@@ -267,10 +270,57 @@ int App::CurrentFormRow(bool* in_input) const
   return 0;
 }
 
+// Focuses the text field of a form row, emptied. The PS4's own keyboard adds
+// what is typed to the text already in the field and has no way to delete
+// any of it, so a field starts blank whenever it is entered. The bound value
+// is cleared along with the element, so the two cannot disagree if the
+// keyboard is dismissed without typing anything.
+bool App::EnterFormInput(int row)
+{
+  Rml::String* value = nullptr;
+  const char* variable = nullptr;
+  switch (row)
+    {
+    case 0: value = &cfg_name_; variable = "name"; break;
+    case 1: value = &cfg_host_; variable = "host"; break;
+    case 2: value = &cfg_port_; variable = "port"; break;
+    case 3: value = &cfg_user_; variable = "user"; break;
+    case 4: value = &cfg_pass_; variable = "pass"; break;
+    default: return false; // the button row has no text field
+    }
+
+  Rml::Element* el = document_->GetElementById(kFormRows[row].input);
+  if (!el)
+    return false;
+
+  value->clear();
+  model_.DirtyVariable(variable);
+  if (auto* input = dynamic_cast<Rml::ElementFormControlInput*>(el))
+    input->SetValue("");
+  el->Focus();
+  return true;
+}
+
 void App::FocusFormField(int delta)
 {
-  const int current = CurrentFormRow(nullptr);
+  bool in_input = false;
+  const int current = CurrentFormRow(&in_input);
   const int next = std::clamp(current + delta, 0, kFormRowCount - 1);
+
+  // From a text field, up/down goes to the neighbouring text field rather
+  // than via its label. The password field is the last one: below it comes
+  // the Save button, reached through its label slot like any other row.
+  if (in_input && current != kButtonRow)
+    {
+      if (next == current)
+	return; // first field and up: stay put, rather than re-enter (and empty) it
+      if (next != kButtonRow)
+	{
+	  EnterFormInput(next);
+	  return;
+	}
+    }
+
   if (Rml::Element* el = document_->GetElementById(kFormRows[next].label))
     el->Focus();
 }
@@ -285,6 +335,10 @@ bool App::FocusFormInput()
   if (in_input || !kFormRows[row].input)
     return false;
 
+  if (row != kButtonRow)
+    return EnterFormInput(row);
+
+  // Save -> Cancel: a button, so there is nothing to empty.
   if (Rml::Element* el = document_->GetElementById(kFormRows[row].input))
     {
       el->Focus();
