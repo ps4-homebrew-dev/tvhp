@@ -233,7 +233,7 @@ bool Player::Initialize(std::string& error) {
     {"cache-pause", "yes", false},
     {"cache-pause-initial", "yes", false},
     {"cache-pause-wait", "1", false},
-    {"demuxer-readahead-secs", "1", false},
+    {"demuxer-readahead-secs", "5", false},
     {"demuxer-max-bytes", "64MiB", false},
     {"demuxer-max-back-bytes", "16MiB", false},
   };
