@@ -38,12 +38,13 @@
 }
 
 /* The two places, Guide and Recordings: a pill each, the one shown in the
- * accent. Square switches. */
+ * accent, between L1 and R1, which switch them (Square toggles too). */
 #tabs {
 	display: flex;
 	flex-direction: row;
+	align-items: center;
 	flex-shrink: 0;
-	padding: 6px;
+	padding: 6px 14px;
 	background-color: #ffffff0a;
 	border-radius: 32px;
 }
@@ -67,6 +68,25 @@
 .tab-label {
 	font-size: 24px;
 	font-weight: bold;
+}
+
+/* The shoulder buttons, small and quiet at either end of the tabs. */
+.tabkey {
+	box-sizing: border-box;
+	width: 46px;
+	padding: 4px 0px;
+	font-size: 16px;
+	font-weight: bold;
+	text-align: center;
+	color: #8593ab;
+	background-color: #ffffff0f;
+	border-radius: 8px;
+}
+.tabkey:first-child {
+	margin-right: 8px;
+}
+.tabkey:last-child {
+	margin-left: 8px;
 }
 
 .tab.selected {

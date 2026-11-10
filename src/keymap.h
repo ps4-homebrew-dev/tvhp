@@ -33,7 +33,12 @@ namespace keymap {
   // those, so take two of the slots it reserves for applications.
   constexpr int KI_MEDIA_REWIND = Rml::Input::KI_FIRST_CUSTOM_KEY + 0;
   constexpr int KI_MEDIA_FAST_FORWARD = Rml::Input::KI_FIRST_CUSTOM_KEY + 1;
-  static_assert(KI_MEDIA_FAST_FORWARD <= Rml::Input::KI_LAST_CUSTOM_KEY,
+  // The pad's L1 and R1, which switch tabs as everywhere on the PS4. Keys of
+  // their own rather than Page Up/Down, which the remote's P+/P- send and
+  // which page through a list.
+  constexpr int KI_TAB_PREV = Rml::Input::KI_FIRST_CUSTOM_KEY + 2;
+  constexpr int KI_TAB_NEXT = Rml::Input::KI_FIRST_CUSTOM_KEY + 3;
+  static_assert(KI_TAB_NEXT <= Rml::Input::KI_LAST_CUSTOM_KEY,
                 "custom key identifiers must stay inside RmlUi's range");
 
   // What a key means to the application. Each key maps to exactly one
@@ -46,8 +51,10 @@ namespace keymap {
     Down,
     Left,
     Right,
-    PageUp,   // L1        | remote "p+"
-    PageDown, // R1        | remote "p-"
+    PageUp,   // L2        | remote "p+"
+    PageDown, // R2        | remote "p-"
+    TabPrev,  // L1: Guide; while watching, as PageUp (zap, seek)
+    TabNext,  // R1: Recordings; while watching, as PageDown
     Home,
     End,
 
@@ -76,6 +83,8 @@ namespace keymap {
     case Rml::Input::KI_DOWN:               return Cmd::Down;
     case Rml::Input::KI_LEFT:               return Cmd::Left;
     case Rml::Input::KI_RIGHT:              return Cmd::Right;
+    case KI_TAB_PREV:                       return Cmd::TabPrev;
+    case KI_TAB_NEXT:                       return Cmd::TabNext;
     case Rml::Input::KI_PRIOR:              return Cmd::PageUp;
     case Rml::Input::KI_NEXT:               return Cmd::PageDown;
     case Rml::Input::KI_HOME:               return Cmd::Home;

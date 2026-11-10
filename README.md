@@ -62,8 +62,9 @@ command is reachable from any of them; the pad mapping lives in
 | Command | Pad | Remote | Keyboard |
 | --- | --- | --- | --- |
 | Navigate | D-pad, left stick (held: repeats) | D-pad | Arrows |
-| Page up / down | L1 / R1 | P+ / P- | Page Up / Page Down |
-| First / last row | L2 / R2 | — | Home / End |
+| Guide / Recordings tab; while watching: zap, seek ±5 min | L1 / R1 | — | — |
+| Page up / down | L2 / R2 | P+ / P- | Page Up / Page Down |
+| First / last row | — | — | Home / End |
 | Select: connect, watch, record, play; play/pause | Cross | Enter | Enter |
 | What can be done with it (menu) | Options (or hold Cross) | Menu (or hold OK) | Insert (or hold Enter) |
 | Back, cancel; from full screen: the menus, playing on | Circle | Back | Escape, Backspace |
@@ -75,7 +76,7 @@ command is reachable from any of them; the pad mapping lives in
 | Play / pause | Cross | Play, Pause | Space |
 | Stop | Circle from the top of the menus, or Options → Stop | Stop | — |
 | Seek ±10 s, growing while pressed | Left / Right | Rewind, Fast forward | Left / Right |
-| Seek ±5 min | Up / Down, L1 / R1 | Skip | Page Up / Page Down |
+| Seek ±5 min | Up / Down, L1 / R1, L2 / R2 | Skip | Page Up / Page Down |
 
 The key identifiers follow what remote controls send, and the pad is mapped
 onto them rather than the other way round. That is why Circle is Escape rather

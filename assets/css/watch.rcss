@@ -238,7 +238,7 @@ body.watching #toast {
 	margin-left: 48px;
 }
 
-/* "22:04 / 45:00", or the programme's "20:00 - 21:30" after LIVE. */
+/* "22:04 / 45:00", or the programme's "20:00 - 21:30". */
 .osd-time {
 	display: flex;
 	flex-direction: row;
@@ -249,16 +249,6 @@ body.watching #toast {
 	white-space: nowrap;
 }
 
-.osd-live {
-	margin-right: 18px;
-	padding: 4px 9px 4px 12px; /* the letter spacing pads the right already */
-	font-size: 19px;
-	font-weight: bold;
-	letter-spacing: 3px;
-	color: #ffffff;
-	background-color: #e04848;
-	border-radius: 7px;
-}
 
 /* "Ends at 21:40", under the time. */
 .osd-ends {

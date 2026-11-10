@@ -10,8 +10,9 @@
 //   circle / B            Escape       back, cancel, stop
 //   square / X            Tab          guide <-> recordings, info bar
 //   triangle / Y          Delete       delete a recording or server
-//   L1 / R1               PageUp/Down  page, zap (repeats)
-//   L2 / R2               Home / End   first / last row
+//   L1 / R1               tab keys     Guide / Recordings; watching: zap,
+//                                      seek (repeats; keymap.h)
+//   L2 / R2               PageUp/Down  page (repeats)
 //   options / start       Apps         add a server; playback menu
 //   back / select         F9           jump to the guide (not on a PS4:
 //                                      the system keeps SHARE)

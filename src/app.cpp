@@ -238,6 +238,11 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     RebuildDetail();
     model_.DirtyVariable("sel_epg");
   });
+  ctor.BindEventCallback("select_section", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& args) {
+    if (args.empty() || bind_menu_open_)
+      return;
+    SetSection(args[0].Get<Rml::String>() == "recordings" ? Section::Recordings : Section::Channels);
+  });
   ctor.BindEventCallback("select_rec", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList& args) {
     if (args.empty())
       return;
@@ -741,10 +746,18 @@ void App::HandleKeyMain(Rml::Event& event, int key)
     case keymap::Cmd::Down:
       MoveSelection(+1);
       break;
-    case keymap::Cmd::PageUp: // left shoulder / "p+"
+    // L1 / R1: the tabs, Guide on the left, Recordings on the right, as on
+    // every PS4 screen with tabs.
+    case keymap::Cmd::TabPrev:
+      SetSection(Section::Channels);
+      break;
+    case keymap::Cmd::TabNext:
+      SetSection(Section::Recordings);
+      break;
+    case keymap::Cmd::PageUp: // L2 / "p+"
       MoveSelection(-8);
       break;
-    case keymap::Cmd::PageDown: // right shoulder / "p-"
+    case keymap::Cmd::PageDown: // R2 / "p-"
       MoveSelection(+8);
       break;
     case keymap::Cmd::Home:

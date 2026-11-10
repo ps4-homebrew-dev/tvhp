@@ -1002,7 +1002,13 @@ void App::HandleKeyMenu(Rml::Event& event, int key)
 void App::HandleKeyWatch(Rml::Event& event, int key)
 {
   const bool recorded = player_ && player_->IsRecordingPlayback();
-  const keymap::Cmd cmd = keymap::Command(key);
+  keymap::Cmd cmd = keymap::Command(key);
+  // L1 / R1 switch tabs in the menus; in full screen there are none, and
+  // they zap and seek as the shoulder buttons always did.
+  if (cmd == keymap::Cmd::TabPrev)
+    cmd = keymap::Cmd::PageUp;
+  else if (cmd == keymap::Cmd::TabNext)
+    cmd = keymap::Cmd::PageDown;
 
   // Both: the playback menu and the audio key.
   switch (cmd)

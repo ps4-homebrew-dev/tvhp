@@ -2,6 +2,7 @@
 //
 // See gamepad.h for the button mapping.
 #include "gamepad.h"
+#include "keymap.h"
 
 #include <map>
 
@@ -57,8 +58,8 @@ KeyIdentifier ButtonKey(Uint8 button) {
   case SDL_CONTROLLER_BUTTON_Y:             return Rml::Input::KI_DELETE;
   case SDL_CONTROLLER_BUTTON_START:         return Rml::Input::KI_APPS;
   case SDL_CONTROLLER_BUTTON_BACK:          return Rml::Input::KI_F9;
-  case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:  return Rml::Input::KI_PRIOR;
-  case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return Rml::Input::KI_NEXT;
+  case SDL_CONTROLLER_BUTTON_LEFTSHOULDER:  return (KeyIdentifier)keymap::KI_TAB_PREV;
+  case SDL_CONTROLLER_BUTTON_RIGHTSHOULDER: return (KeyIdentifier)keymap::KI_TAB_NEXT;
   case SDL_CONTROLLER_BUTTON_DPAD_UP:       return Rml::Input::KI_UP;
   case SDL_CONTROLLER_BUTTON_DPAD_DOWN:     return Rml::Input::KI_DOWN;
   case SDL_CONTROLLER_BUTTON_DPAD_LEFT:     return Rml::Input::KI_LEFT;
@@ -68,6 +69,9 @@ KeyIdentifier ButtonKey(Uint8 button) {
 }
 
 bool Repeats(KeyIdentifier key) {
+  // L1 / R1 too: they zap while watching. (Outside the enum: not a case.)
+  if ((int)key == keymap::KI_TAB_PREV || (int)key == keymap::KI_TAB_NEXT)
+    return true;
   switch (key) {
   case Rml::Input::KI_UP:
   case Rml::Input::KI_DOWN:
@@ -114,10 +118,10 @@ KeyIdentifier AxisKey(Uint8 axis, int value, KeyIdentifier current) {
     positive = Rml::Input::KI_DOWN;
     break;
   case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
-    positive = Rml::Input::KI_HOME;
+    positive = Rml::Input::KI_PRIOR;
     break;
   case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
-    positive = Rml::Input::KI_END;
+    positive = Rml::Input::KI_NEXT;
     break;
   default:
     return Rml::Input::KI_UNKNOWN;
