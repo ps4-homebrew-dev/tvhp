@@ -12,19 +12,6 @@
 
 using namespace appdetail;
 
-namespace {
-
-// The row 'delta' steps from 'current' in a list of 'count' rows (count > 0).
-// A single step past either end wraps round to the other; bigger jumps (the
-// shoulder buttons, home and end) stop at the end instead.
-int StepIndex(int current, int delta, int count)
-{
-  if (delta == 1 || delta == -1)
-    return ((current + delta) % count + count) % count;
-  return std::clamp(current + delta, 0, count - 1);
-}
-
-} // namespace
 
 App::App() : player_(std::make_unique<Player>()) {}
 
@@ -51,7 +38,9 @@ bool App::Initialize(Rml::Context* context, const Options& options, std::string&
   // the app still browses the guide and the recordings; playing says why it
   // can't.
   std::string player_error;
-  if (!player_->Initialize(player_error))
+  if (player_->Initialize(player_error, options.fonts_dir))
+    ApplyPlayerPrefs();
+  else
     Rml::Log::Message(Rml::Log::LT_WARNING, "No playback: %s", player_error.c_str());
 
   RebuildServerRows();
@@ -70,6 +59,8 @@ void App::Shutdown() {
     connect_thread_.join();
 
   if (player_) {
+    // How far a recording got goes to the server while it is still there.
+    SaveRecordingPosition();
     player_->Stop(client_);
     player_->Shutdown();
   }
@@ -122,8 +113,17 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     row.RegisterMember("state", &RecRow::state);
     row.RegisterMember("pending", &RecRow::pending);
     row.RegisterMember("failed", &RecRow::failed);
+    row.RegisterMember("progress", &RecRow::progress);
+    row.RegisterMember("resumable", &RecRow::resumable);
+    row.RegisterMember("watched", &RecRow::watched);
   }
   ctor.RegisterArray<std::vector<RecRow>>();
+
+  if (auto row = ctor.RegisterStruct<MenuRow>()) {
+    row.RegisterMember("label", &MenuRow::label);
+    row.RegisterMember("value", &MenuRow::value);
+  }
+  ctor.RegisterArray<std::vector<MenuRow>>();
 
   ctor.Bind("view", &bind_view_);
   ctor.Bind("section", &bind_section_);
@@ -164,6 +164,22 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
   ctor.Bind("watch_time", &bind_watch_time_);
   ctor.Bind("watch_progress", &bind_watch_progress_);
   ctor.Bind("watch_recorded", &bind_watch_recorded_);
+  ctor.Bind("watch_paused", &bind_watch_paused_);
+  ctor.Bind("watch_ends", &bind_watch_ends_);
+  ctor.Bind("watch_seek", &bind_watch_seek_);
+  ctor.Bind("watch_seek_at", &bind_watch_seek_at_);
+  ctor.Bind("watch_vtrack", &bind_watch_vtrack_);
+  ctor.Bind("watch_atrack", &bind_watch_atrack_);
+  ctor.Bind("watch_strack", &bind_watch_strack_);
+  ctor.Bind("watch_speed", &bind_watch_speed_);
+  ctor.Bind("watch_sleep", &bind_watch_sleep_);
+  ctor.Bind("menu_open", &bind_menu_open_);
+  ctor.Bind("menu_dialog", &bind_menu_dialog_);
+  ctor.Bind("menu_title", &bind_menu_title_);
+  ctor.Bind("menu_meta", &bind_menu_meta_);
+  ctor.Bind("menu_progress", &bind_menu_progress_);
+  ctor.Bind("menu", &menu_rows_);
+  ctor.Bind("sel_menu", &sel_menu_);
 
   ctor.BindEventCallback("save", [this](Rml::DataModelHandle, Rml::Event&, const Rml::VariantList&) {
     SaveServer();
@@ -333,16 +349,54 @@ void App::Update() {
     RefreshFromClient(false);
   }
 
+  if (bind_watching_ && player_)
+    {
+      // A recording played to its end: counted as watched on the server,
+      // and back to the list.
+      if (player_->AtEnd())
+	{
+	  HtspDvrEntry entry;
+	  const bool known = client_.GetDvrEntry(playing_dvr_id_, &entry);
+	  SaveRecordingPosition(true);
+	  playing_dvr_id_ = 0; // saved; StopPlayback() has nothing to add
+	  StopPlayback();
+	  ShowToast(known && !entry.title.empty() ? "Finished: " + entry.title : "Finished");
+	  return;
+	}
+      // The position, now and then, in case the app does not get to stop.
+      if (playing_dvr_id_ && !player_->IsPaused() &&
+	  Now() - position_saved_at_ > kPositionSaveSec)
+	{
+	  position_saved_at_ = Now();
+	  SaveRecordingPosition();
+	}
+    }
+  UpdateSleepTimer();
+
   // Watch info bar: refresh while visible (cheap; only dirties on change),
-  // then auto-hide. The bar stays up while a recording is paused so the
-  // transport controls remain visible.
+  // then auto-hide. The bar stays up while a recording is paused, and while
+  // the playback menu is open, so the transport and the tracks show.
   if (bind_watching_ && bind_info_visible_)
     {
       UpdateWatchOverlay();
-      if (Now() > info_deadline_ && !(player_ && player_->IsPaused()))
+      if (Now() > info_deadline_ && !bind_menu_open_ && !(player_ && player_->IsPaused()))
 	{
 	  bind_info_visible_ = false;
 	  model_.DirtyVariable("info_visible");
+	}
+    }
+  // The menu's values follow what changes under them (a track the stream
+  // announces late, the sleep timer counting down).
+  if (bind_menu_open_ && !bind_menu_dialog_)
+    {
+      for (size_t i = 0; i < menu_items_.size() && i < menu_rows_.size(); i++)
+	{
+	  const Rml::String value = menu_items_[i].value ? menu_items_[i].value() : "";
+	  if (menu_rows_[i].value != value)
+	    {
+	      menu_rows_[i].value = value;
+	      model_.DirtyVariable("menu");
+	    }
 	}
     }
 
@@ -374,6 +428,11 @@ void App::Update() {
     {
       EnsureRowVisible("rec-list", sel_rec_, kRecRowPitch);
       scroll_rec_pending_ = false;
+    }
+  if (scroll_menu_pending_)
+    {
+      EnsureRowVisible("menu-rows", sel_menu_, kMenuRowPitch);
+      scroll_menu_pending_ = false;
     }
 }
 
@@ -578,7 +637,9 @@ void App::ProcessEvent(Rml::Event& event)
       return;
     }
 
-  if (view_ == View::Connect)
+  if (bind_menu_open_)
+    HandleKeyMenu(event, key);
+  else if (view_ == View::Connect)
     HandleKeyConnect(event, key);
   else
     HandleKeyMain(event, key);

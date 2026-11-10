@@ -9,6 +9,7 @@
 		<link type="text/rcss" href="css/recordings.rcss"/>
 		<link type="text/rcss" href="css/details.rcss"/>
 		<link type="text/rcss" href="css/watch.rcss"/>
+		<link type="text/rcss" href="css/menu.rcss"/>
 	</head>
 	<body data-model="tv" data-class-watching="watching">
 
@@ -162,7 +163,11 @@
 						     data-event-click="select_rec(it_index)">
 							<div class="recinfo">
 								<div class="rectitle">{{rec.title}}</div>
-								<div class="recmeta">{{rec.meta}}</div>
+								<div class="recmeta"><span class="recwatched" data-if="rec.watched">WATCHED</span>{{rec.meta}}</div>
+								<!-- Left part-way: how far (Tvheadend keeps it). -->
+								<div class="recprogress" data-if="rec.resumable">
+									<div class="bar" data-style-width="rec.progress"/>
+								</div>
 							</div>
 							<div class="recstate">{{rec.state}}</div>
 						</div>
@@ -210,11 +215,45 @@
 				</div>
 				<div class="watch-side">
 					<div class="watch-time">{{watch_time}}</div>
+					<div class="watch-ends" data-if="watch_ends != ''">{{watch_ends}}</div>
 					<div class="watch-status" data-if="player_status != ''">{{player_status}}</div>
 				</div>
 			</div>
+			<!-- The bar, and riding on it while seeking, how far in all. -->
 			<div class="watch-progress" data-if="watch_time != ''">
 				<div class="bar" data-style-width="watch_progress"/>
+				<div class="watch-seek" data-if="watch_seek != ''" data-style-left="watch_seek_at">{{watch_seek}}</div>
+			</div>
+			<!-- What is being decoded, and the settings that are on. -->
+			<div class="watch-tracks">
+				<span class="watch-track" data-if="watch_vtrack != ''">{{watch_vtrack}}</span>
+				<span class="watch-track" data-if="watch_atrack != ''">{{watch_atrack}}</span>
+				<span class="watch-track" data-if="watch_strack != ''">{{watch_strack}}</span>
+				<span class="watch-track badge" data-if="watch_speed != ''">{{watch_speed}}</span>
+				<span class="watch-track badge" data-if="watch_sleep != ''">{{watch_sleep}}</span>
+				<span class="spacer"/>
+				<span class="keycap" data-if="!menu_open">OPTIONS</span>
+				<span class="hint" data-if="!menu_open">Audio, subtitles, picture</span>
+			</div>
+		</div>
+
+		<!-- The playback menu (Options while watching): a blade on the left.
+		     Or, with menu_dialog, a question in the middle of the screen
+		     (resume a recording?). Left/right change a setting, cross runs
+		     an action, circle closes. -->
+		<div id="menu-scrim" data-if="menu_open" data-class-dialog="menu_dialog"/>
+		<div id="menu" data-if="menu_open" data-class-dialog="menu_dialog">
+			<div class="menu-title">{{menu_title}}</div>
+			<div class="dialog-meta" data-if="menu_dialog && menu_meta != ''">{{menu_meta}}</div>
+			<div class="dialog-progress" data-if="menu_dialog && menu_meta != ''">
+				<div class="dialog-played" data-style-width="menu_progress"/>
+			</div>
+			<div id="menu-rows">
+				<div class="menu-row" data-for="m : menu"
+				     data-class-selected="it_index == sel_menu">
+					<span class="menu-label">{{m.label}}</span>
+					<span class="menu-value" data-if="m.value != ''">‹  {{m.value}}  ›</span>
+				</div>
 			</div>
 		</div>
 

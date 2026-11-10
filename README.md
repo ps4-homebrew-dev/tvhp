@@ -19,6 +19,16 @@ connection that carries the channel list and the guide.
   or delete entries.
 - **Playback of recordings over HTSP**, using the server's file API, including
   recordings that are still running.
+- **Resume where you left off** — the position is kept by Tvheadend itself
+  (HTSP 27+), so it is shared with Kodi and every other client. The list shows
+  how far each recording got and which have been watched.
+- **Playback menu** (Options while watching) — audio track, subtitles, speed,
+  night mode, picture fit, audio and subtitle delay, subtitle size, sleep timer
+  (live TV can sleep at the end of the programme on air).
+- **DVB subtitles on live TV and recordings.** A language you pick stays picked
+  from channel to channel, as does turning them off.
+- Seek steps that grow while you keep pressing (10 s → 30 s → 1 min → 5 min),
+  "ends at" for recordings, and the tracks being played on the info bar.
 - **Multiple servers** — save as many as you like and switch between them
   without restarting.
 - Designed for a 1920x1080 screen at couch distance: large type, high
@@ -41,12 +51,13 @@ command is reachable from any of them; the pad mapping lives in
 | Back, cancel | Circle | Back | Escape, Backspace |
 | Guide ↔ recordings, info bar | Square | Display | Tab |
 | Delete recording or server | Triangle | Red | Delete |
-| Add a server | Options | Menu | Insert |
+| Add a server; playback menu while watching | Options (or hold Cross) | Menu (or hold OK) | Insert (or hold Enter) |
+| Next audio track | — | Audio | F2 |
 | Jump to the guide | Back/select (not on a PS4) | Guide | F9 |
 | Play / pause | Cross | Play, Pause | Space |
 | Stop | Circle | Stop | — |
-| Seek ±5 min | Up / Down | Rewind, Fast forward | — |
-| Seek ±30 s | Left / Right | — | Left / Right |
+| Seek ±10 s, growing while pressed | Left / Right | Rewind, Fast forward | Left / Right |
+| Seek ±5 min | Up / Down, L1 / R1 | Skip | Page Up / Page Down |
 
 The key identifiers follow what remote controls send, and the pad is mapped
 onto them rather than the other way round. That is why Circle is Escape rather
@@ -86,6 +97,15 @@ HTSP connection, which mpv reads through two stream protocols of tvhp's own
   with seeking. At the end of a recording that is still running, playback
   waits for more instead of stopping.
 
+Live channels carry their DVB subtitles into the transport stream as well.
+Teletext subtitles are left out: decoding them needs an FFmpeg built with
+libzvbi.
+
+The playback menu's settings, and the audio and subtitle languages last picked,
+are kept in `tvhp.cfg` with the servers (`player.*` keys). The languages work
+as mpv's `alang`/`slang`: a subtitle track in the remembered language is
+switched on by itself when a channel starts.
+
 Extra mpv options can be given for testing or tuning, and mpv's log made more
 verbose:
 
@@ -120,5 +140,6 @@ For the PS4, with the ps4-homebrew-dev SDK, the same CMakeLists.txt builds
 - No series recording: `autorec` and `timerec` rules are neither listed nor
   editable.
 - No transcoding profile selection; the server's default is used.
-- No audio track or subtitle selection: mpv plays the first audio track (or
-  the one `alang` picks), and DVB subtitles and teletext are left out.
+- No teletext subtitles (see Playback).
+- Switching the audio track on live TV can leave a few seconds of silence:
+  the new track joins where mpv is reading, slightly ahead of the picture.

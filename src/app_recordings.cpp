@@ -1,6 +1,7 @@
 // Recordings view: the DVR list and detail, plus the scheduling, cancelling
 // and deleting actions that act on the highlighted entry.
 #include <algorithm>
+#include <cstdio>
 #include <sstream>
 
 #include "app.h"
@@ -51,6 +52,18 @@ void App::RebuildRecordingRows()
       row.state = DvrStateLabel(e);
       row.pending = e.IsPending();
       row.failed = !e.error.empty() || e.state == "missed" || e.state == "invalid";
+      // Where it was left, of its scheduled length; and whether it has
+      // been watched to the end (the server keeps both).
+      const int64_t length = e.stop - e.start;
+      row.resumable = e.HasFile() && e.play_position >= kMinResumeSec && length > 0;
+      if (row.resumable)
+	{
+	  char pct[16];
+	  std::snprintf(pct, sizeof(pct), "%.1f%%",
+			std::min(100.0, e.play_position * 100.0 / (double)length));
+	  row.progress = pct;
+	}
+      row.watched = e.HasFile() && e.play_count > 0 && !row.resumable;
       rec_rows_.push_back(std::move(row));
     }
 
@@ -105,6 +118,10 @@ void App::RebuildRecordingDetail()
 	bind_detail_desc_ = "No description available.";
 
       bind_detail_rec_ = DvrStateLabel(*e);
+      if (e->HasFile() && e->play_position >= kMinResumeSec)
+	bind_detail_rec_ += "  ·  Resume from " + FmtPosition(e->play_position * 1000000LL);
+      else if (e->HasFile() && e->play_count > 0)
+	bind_detail_rec_ += "  ·  Watched";
     }
 
   model_.DirtyVariable("detail_title");
@@ -197,16 +214,13 @@ void App::PlaySelectedRecording()
       return;
     }
 
-  const uint32_t dvr_id = e->id;
-  std::string error;
-  if (!player_->PlayRecording(client_, dvr_id, error))
+  // Left part-way, here or on another client: ask whether to go on.
+  if (client_.SupportsPlayPosition() && e->play_position >= kMinResumeSec)
     {
-      ShowToast(error.empty() ? "Unable to play this recording" : error);
+      OpenResumeDialog(*e);
       return;
     }
-  playing_dvr_id_ = dvr_id;
-  playing_channel_id_ = 0;
-  EnterWatch();
+  StartRecording(e->id, 0);
 }
 
 // Triangle in the recordings list: cancels an upcoming or running recording,

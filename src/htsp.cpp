@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <chrono>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
@@ -38,6 +39,11 @@ namespace {
   constexpr int kMaxMessageSize = 10 * 1024 * 1024;
   constexpr int kReadPollMs = 250;      // reader thread poll granularity
   constexpr int kRequestTimeoutMs = 5000;
+
+  // updateDvrEntry / fileClose "playcount": not a count but what to do with
+  // it (Tvheadend's HTSP_DVR_PLAYCOUNT_*).
+  constexpr uint32_t kPlayCountKeep = 0x7ffffffe;
+  constexpr uint32_t kPlayCountIncrement = 0x7fffffff;
   // fileRead can carry up to a megabyte of payload and may have to wait for
   // the server to flush an in-progress recording, so it gets more headroom.
   constexpr int kFileRequestTimeoutMs = 15000;
@@ -435,6 +441,8 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	      htsmsg_get_u32(s, "rate", &info.rate);
 	      if (const char* lang = htsmsg_get_str(s, "language"))
 		info.language = lang;
+	      htsmsg_get_u32(s, "composition_id", &info.composition_id);
+	      htsmsg_get_u32(s, "ancillary_id", &info.ancillary_id);
 	      const void* meta = nullptr;
 	      size_t meta_len = 0;
 	      if (!htsmsg_get_bin(s, "meta", &meta, &meta_len) && meta_len > 0)
@@ -487,8 +495,8 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	  if (stream_cbs.on_stop)
 	    stream_cbs.on_stop();
 	}
-      else if (status)
-	stream_cbs.on_status(status);
+      else
+	stream_cbs.on_status(status ? status : ""); // "" = the trouble is over
     }
 }
 
@@ -770,6 +778,10 @@ void HtspClient::UpsertDvrEntryLocked(htsmsg_t* msg)
     e.episode = u32;
   if (!htsmsg_get_u32(msg, "enabled", &u32))
     e.enabled = u32 != 0;
+  if (!htsmsg_get_u32(msg, "playposition", &u32))
+    e.play_position = u32;
+  if (!htsmsg_get_u32(msg, "playcount", &u32))
+    e.play_count = u32;
   if (const char* s = htsmsg_get_str(msg, "title"))
     e.title = s;
   if (const char* s = htsmsg_get_str(msg, "subtitle"))
@@ -895,6 +907,38 @@ bool HtspClient::RecordEvent(uint32_t event_id, std::string& error, uint32_t* ou
   htsmsg_add_str(msg, "method", "addDvrEntry");
   htsmsg_add_u32(msg, "eventId", event_id);
   return SimpleRequest(msg, error, out_id);
+}
+
+void HtspClient::SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watched)
+{
+  if (!running || !SupportsPlayPosition())
+    return;
+  {
+    std::lock_guard<std::mutex> lock(channels_mutex);
+    auto it = dvr.find(dvr_id);
+    if (it != dvr.end())
+      {
+	it->second.play_position = seconds;
+	if (watched)
+	  it->second.play_count++;
+	generation++;
+      }
+  }
+
+  htsmsg_t* msg = htsmsg_create_map();
+  htsmsg_add_str(msg, "method", "updateDvrEntry");
+  htsmsg_add_u32(msg, "id", dvr_id);
+  htsmsg_add_u32(msg, "playposition", seconds);
+  if (watched)
+    htsmsg_add_u32(msg, "playcount", kPlayCountIncrement);
+  // A sequence number nobody waits for: the reader drops the reply.
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex);
+    htsmsg_add_u32(msg, "seq", next_seq++);
+  }
+  std::string error;
+  if (!SendMessage(msg, error))
+    std::fprintf(stderr, "htsp updateDvrEntry: %s\n", error.c_str());
 }
 
 bool HtspClient::CancelDvrEntry(uint32_t dvr_id, std::string& error)
@@ -1030,6 +1074,11 @@ void HtspClient::FileClose(uint32_t handle)
   htsmsg_t* msg = htsmsg_create_map();
   htsmsg_add_str(msg, "method", "fileClose");
   htsmsg_add_u32(msg, "id", handle);
+  // Closing a recording counts as having watched it, unless asked not to
+  // (HTSP 27+). It is counted when it is watched to the end instead, by
+  // SavePlayPosition(); a peek at the first minutes is no viewing.
+  if (SupportsPlayPosition())
+    htsmsg_add_u32(msg, "playcount", kPlayCountKeep);
   std::string error;
   if (htsmsg_t* reply = SendRequest(msg, kRequestTimeoutMs, error))
     htsmsg_destroy(reply);

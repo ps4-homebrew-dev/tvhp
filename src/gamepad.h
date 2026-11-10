@@ -12,7 +12,7 @@
 //   triangle / Y          Delete       delete a recording or server
 //   L1 / R1               PageUp/Down  page, zap (repeats)
 //   L2 / R2               Home / End   first / last row
-//   options / start       Apps         add a server
+//   options / start       Apps         add a server; playback menu
 //   back / select         F9           jump to the guide (not on a PS4:
 //                                      the system keeps SHARE)
 //
@@ -38,8 +38,25 @@ void Shutdown();
 // then needs no further handling.
 bool HandleEvent(Rml::Context* context, const SDL_Event& event);
 
-// Once per frame, after the events: repeats the held direction.
+// Once per frame, after the events: repeats the held direction, and turns
+// an OK held long enough into Options.
 void Update(Rml::Context* context);
+
+// The long press of OK (Return or keypad Enter: a remote's OK arrives as
+// Return), for the remotes that have no options key or whose TV does not
+// pass it on over HDMI-CEC. Its press is held back until it is clear which
+// it is: let go within kOkHoldMs, it was OK after all; held that long,
+// Update() sends Options (Apps, see keymap.h) and the press and its release
+// go nowhere. Any other press while OK is held back also makes it OK,
+// delivered first. (From jtplay.)
+//
+// Feed every event before handling it. What to do with it:
+enum class Hold {
+  kPass,    // handle it as usual
+  kSwallow, // drop it
+  kReplay,  // handle *press (the held-back OK) first, then it as usual
+};
+Hold HoldOk(const SDL_Event& event, SDL_Event* press);
 
 } // namespace gamepad
 

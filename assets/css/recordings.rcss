@@ -94,3 +94,28 @@
 #recordings.active .rec-row.selected .rectitle {
 	color: #ffffff;
 }
+
+/* Left part-way: how far, under the meta line (Tvheadend keeps it). */
+.recprogress {
+	display: block;
+	width: 100%;
+	height: 5px;
+	margin-top: 8px;
+	background-color: #ffffff10;
+}
+
+.recprogress .bar {
+	display: block;
+	height: 5px;
+	background-color: #f5b453;
+}
+
+/* Watched to the end at least once. */
+.recwatched {
+	margin-right: 10px;
+	padding: 3px 8px;
+	font-size: 15px;
+	letter-spacing: 2px;
+	color: #7fd1a0;
+	border: 2px #7fd1a060;
+}

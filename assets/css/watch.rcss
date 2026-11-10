@@ -18,6 +18,13 @@ body.watching #footer {
 	display: none;
 }
 
+/* Over the picture, notices go to the top, clear of the info bar and the
+ * seek bubble. */
+body.watching #toast {
+	top: 60px;
+	bottom: auto;
+}
+
 #watch-bar {
 	position: absolute;
 	left: 0;
@@ -74,6 +81,7 @@ body.watching #footer {
 
 .watch-progress {
 	display: block;
+	position: relative;
 	margin-top: 24px;
 	width: 100%;
 	height: 8px;
@@ -101,4 +109,67 @@ body.watching #footer {
 	font-size: 22px;
 	letter-spacing: 2px;
 	color: #8593ab;
+}
+
+.watch-ends {
+	margin-top: 6px;
+	font-size: 22px;
+	color: #8593ab;
+}
+
+/* Seeking: how far the presses so far have jumped, riding on the bar. The
+ * app positions its left edge (240px wide; see UpdateWatchOverlay). */
+.watch-seek {
+	position: absolute;
+	bottom: 20px;
+	box-sizing: border-box;
+	width: 240px;
+	padding: 8px 0px;
+	font-size: 28px;
+	font-weight: bold;
+	text-align: center;
+	color: #10131c;
+	background-color: #f5b453;
+}
+
+/* The tracks being decoded and the settings that are on, as chips, with
+ * the hint for the playback menu at the far end. */
+.watch-tracks {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	margin-top: 20px;
+}
+
+.watch-track {
+	margin-right: 14px;
+	padding: 6px 14px;
+	font-size: 20px;
+	color: #a9b4c8;
+	background-color: #ffffff10;
+	white-space: nowrap;
+}
+
+.watch-track.badge {
+	color: #10131c;
+	background-color: #f5b453;
+	font-weight: bold;
+}
+
+.watch-tracks .spacer {
+	flex: 1;
+}
+
+.watch-tracks .hint {
+	margin-right: 0px;
+}
+
+/* A button without icon art: its name on a keycap. */
+.keycap {
+	padding: 4px 10px;
+	font-size: 16px;
+	font-weight: bold;
+	letter-spacing: 2px;
+	color: #c5cee0;
+	border: 2px #8593ab;
 }

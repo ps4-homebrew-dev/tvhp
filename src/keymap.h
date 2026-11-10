@@ -56,7 +56,7 @@ namespace keymap {
     Back,      // Circle    | back, prev     | Escape, Backspace
     Secondary, // Square    | display        | Tab
     Remove,    // Triangle  | red            | Delete
-    Options,   // Options   | menu, context  | Insert
+    Options,   // Options   | menu, context  | Insert   (or hold Cross / Enter)
     Guide,     // Select    | guide          | F9 (no pad button on a PS4)
 
     // Transport. Pad users reach these through Cross and the d-pad; the
@@ -67,6 +67,7 @@ namespace keymap {
     SeekForward, // fast forward
     SkipBack,    // |<
     SkipForward, // >|
+    Audio,       // the remote's audio key: next audio track
   };
 
   constexpr Cmd Command(int key) {
@@ -100,6 +101,10 @@ namespace keymap {
     case Rml::Input::KI_INSERT:             return Cmd::Options;
 
     case Rml::Input::KI_F9:                 return Cmd::Guide;
+
+    // The PS4's SDL sends an HDMI-CEC remote's audio key as F2 (and its
+    // display key as F4, above).
+    case Rml::Input::KI_F2:                 return Cmd::Audio;
 
     case Rml::Input::KI_SPACE:              return Cmd::PlayPause;
     case Rml::Input::KI_PAUSE:              return Cmd::PlayPause;

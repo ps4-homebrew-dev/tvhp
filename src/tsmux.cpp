@@ -49,6 +49,10 @@ AVCodecID TsCodec(const std::string& type) {
   if (type == "MPEG2AUDIO") return AV_CODEC_ID_MP2;
   if (type == "MP3") return AV_CODEC_ID_MP3;
   if (type == "OPUS") return AV_CODEC_ID_OPUS;
+  // Picture subtitles; Tvheadend hands them over as the decoder takes them
+  // (from the 0x0f sync byte, PES framing stripped), and the muxer frames
+  // them again. Teletext would need FFmpeg built with libzvbi to show.
+  if (type == "DVBSUB") return AV_CODEC_ID_DVB_SUBTITLE;
   return AV_CODEC_ID_NONE;
 }
 
@@ -79,7 +83,7 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
   if (avformat_alloc_output_context2(&fmt_, nullptr, "mpegts", nullptr) < 0 || !fmt_)
     return {};
 
-  std::string video_desc, audio_desc;
+  std::string video_desc, audio_desc, subtitle_desc;
   for (const HtspStreamInfo& info : streams) {
     const AVCodecID codec = TsCodec(info.type);
     if (codec == AV_CODEC_ID_NONE)
@@ -91,19 +95,31 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
     AVStream* st = avformat_new_stream(fmt_, nullptr);
     if (!st)
       continue;
-    const bool video = avcodec_get_type(codec) == AVMEDIA_TYPE_VIDEO;
+    const AVMediaType kind = avcodec_get_type(codec);
+    const bool video = kind == AVMEDIA_TYPE_VIDEO;
     AVCodecParameters* par = st->codecpar;
-    par->codec_type = video ? AVMEDIA_TYPE_VIDEO : AVMEDIA_TYPE_AUDIO;
+    par->codec_type = kind;
     par->codec_id = codec;
     if (video) {
       par->width = (int)info.width;
       par->height = (int)info.height;
-    } else {
+    } else if (kind == AVMEDIA_TYPE_AUDIO) {
       par->sample_rate = (int)info.rate;
       if (info.channels > 0)
         av_channel_layout_default(&par->ch_layout, (int)info.channels);
+    } else if (codec == AV_CODEC_ID_DVB_SUBTITLE) {
+      // The pages the subtitles are on, for the stream's subtitling
+      // descriptor: the decoder shows those and no others.
+      par->extradata = static_cast<uint8_t*>(av_mallocz(4 + AV_INPUT_BUFFER_PADDING_SIZE));
+      if (par->extradata) {
+        par->extradata[0] = (uint8_t)(info.composition_id >> 8);
+        par->extradata[1] = (uint8_t)info.composition_id;
+        par->extradata[2] = (uint8_t)(info.ancillary_id >> 8);
+        par->extradata[3] = (uint8_t)info.ancillary_id;
+        par->extradata_size = 4;
+      }
     }
-    if (!info.extradata.empty()) {
+    if (!info.extradata.empty() && !par->extradata) {
       par->extradata = static_cast<uint8_t*>(
           av_mallocz(info.extradata.size() + AV_INPUT_BUFFER_PADDING_SIZE));
       if (par->extradata) {
@@ -115,6 +131,11 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
       av_dict_set(&st->metadata, "language", info.language.c_str(), 0);
     st->time_base = kMicroseconds;
     streams_[info.index] = st->index;
+    if (kind == AVMEDIA_TYPE_SUBTITLE) {
+      subtitle_desc += (subtitle_desc.empty() ? "" : ", ") +
+                       (info.language.empty() ? std::string("subtitles") : info.language);
+      continue;
+    }
 
     // The description names the first video and the first audio stream,
     // which are what mpv picks unless told otherwise.
@@ -126,7 +147,8 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
     }
   }
 
-  if (streams_.empty()) {
+  // Subtitles alone are nothing to play.
+  if (video_desc.empty() && audio_desc.empty()) {
     FreeMuxer();
     return {};
   }
@@ -168,6 +190,8 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
   std::string desc = video_desc;
   if (!audio_desc.empty())
     desc += (desc.empty() ? "" : " + ") + audio_desc;
+  if (!subtitle_desc.empty())
+    desc += " + DVB subtitles (" + subtitle_desc + ")";
   return desc;
 }
 
@@ -184,10 +208,17 @@ void TsMux::Write(const HtspMuxPacket& in) {
   if (dts == INT64_MIN)
     return; // nothing to place it by; the demuxer couldn't either
 
-  if (base_us_ == INT64_MIN)
+  // Subtitles are sparse: a page may come minutes after the last one, and
+  // they don't say where the timeline is. Video and audio do.
+  const bool sparse =
+    fmt_->streams[index]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE;
+  if (base_us_ == INT64_MIN) {
+    if (sparse)
+      return;
     base_us_ = std::min(dts, pts != INT64_MIN ? pts : dts);
+  }
   const int64_t last = last_dts_[index];
-  if (last != INT64_MIN) {
+  if (last != INT64_MIN && !sparse) {
     const int64_t rel = dts - base_us_ + kStartUs;
     if (rel < last - kJumpUs || rel > last + kJumpUs) {
       std::fprintf(stderr, "tsmux: timestamp discontinuity (%+.1f s), re-basing\n",
@@ -218,7 +249,7 @@ void TsMux::Write(const HtspMuxPacket& in) {
   pkt->dts = av_rescale_q(dts, kMicroseconds, tb);
   pkt->duration = in.duration > 0 ? av_rescale_q(in.duration, kMicroseconds, tb) : 0;
   if (in.frametype == 'I' ||
-      avcodec_get_type(fmt_->streams[index]->codecpar->codec_id) == AVMEDIA_TYPE_AUDIO)
+      avcodec_get_type(fmt_->streams[index]->codecpar->codec_id) != AVMEDIA_TYPE_VIDEO)
     pkt->flags |= AV_PKT_FLAG_KEY;
 
   // Packets arrive interleaved already; av_write_frame() keeps them in that

@@ -299,14 +299,12 @@ bool Backend::ProcessEvents(Rml::Context* context, KeyDownCallback key_down_call
 	else
 		has_event = SDL_PollEvent(&ev);
 
-	while (has_event)
-	{
+	// tvhp: one event's handling, a lambda so that the OK press held back
+	// for its long press (gamepad::HoldOk) can be handled later.
+	auto handle = [&](SDL_Event& ev) {
 #if SDL_MAJOR_VERSION == 2
 		if (gamepad::HandleEvent(context, ev))
-		{
-			has_event = SDL_PollEvent(&ev);
-			continue;
-		}
+			return;
 #endif
 		bool propagate_event = true;
 		switch (ev.type)
@@ -352,7 +350,24 @@ bool Backend::ProcessEvents(Rml::Context* context, KeyDownCallback key_down_call
 
 		if (propagate_event)
 			RmlSDL::InputEventHandler(context, data->window, ev);
+	};
 
+	while (has_event)
+	{
+#if SDL_MAJOR_VERSION == 2
+		SDL_Event ok_press;
+		switch (gamepad::HoldOk(ev, &ok_press))
+		{
+		case gamepad::Hold::kSwallow: break;
+		case gamepad::Hold::kReplay:
+			handle(ok_press);
+			handle(ev);
+			break;
+		case gamepad::Hold::kPass: handle(ev); break;
+		}
+#else
+		handle(ev);
+#endif
 		has_event = SDL_PollEvent(&ev);
 	}
 

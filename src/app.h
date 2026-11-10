@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <string>
 #include <thread>
@@ -80,8 +81,24 @@ private:
     Rml::String title;
     Rml::String meta;    // "SVT1  -  Today 20:00"
     Rml::String state;   // "Recording", "Scheduled", "Failed", duration...
+    Rml::String progress = "0%"; // how far it was watched; data-style-width
     bool pending = false;
     bool failed = false;
+    bool resumable = false; // left part-way: the progress bar shows
+    bool watched = false;   // watched to the end at least once
+  };
+  // A row of the playback menu, or of a question such as "resume?".
+  struct MenuRow {
+    Rml::String label;
+    Rml::String value; // the current setting, "" for plain actions
+  };
+  // An entry of the menu. 'value' reports the current setting; 'change' is
+  // called with -1/+1 for left/right and 0 for select. Entries without a
+  // value are actions: they close the menu when selected.
+  struct MenuItem {
+    std::string label;
+    std::function<std::string()> value;
+    std::function<void(int)> change;
   };
   bool SetupDataModel(Rml::Context* context, std::string& error);
 
@@ -144,6 +161,36 @@ private:
   void EnsureRowVisible(const char* list_id, int index, float row_pitch);
   void ShowToast(const std::string& text);
 
+  // --- Playback (from jtplay) ----------------------------------------------
+  // Recordings: asks whether to resume when the server has a position for
+  // it, then plays.
+  void StartRecording(uint32_t dvr_id, int64_t start_seconds);
+  // Tells the server how far the recording that plays has got ('ended':
+  // all the way), so it resumes there on any client. Sent when playback
+  // stops and every kPositionSaveSec; skipped when nothing has changed.
+  void SaveRecordingPosition(bool ended = false);
+  // Left/right and the remote's rewind/fast forward: steps that grow while
+  // pressed in quick succession, with a bubble saying how far in all.
+  void SeekStep(int sign, bool large);
+  void CycleAudioTrack(int direction);
+  void CycleSubtitleTrack(int direction);
+  // A track picked by hand: its language is remembered and preferred from
+  // then on, so subtitles stay on (or off) from one channel to the next.
+  void PickAudioTrack(const TrackInfo& track);
+  void PickSubtitleTrack(const TrackInfo* track); // nullptr = off
+  void ApplyPlayerPrefs();
+  void SavePlayerPrefs();
+  std::string SleepLabel() const;
+  void UpdateSleepTimer();
+
+  // The playback menu (Options while watching) and the resume question:
+  // a side blade, or a small dialog in the middle of the screen.
+  void OpenWatchMenu();
+  void OpenResumeDialog(const HtspDvrEntry& entry);
+  void CloseMenu();
+  void RebuildMenuRows();
+  void HandleKeyMenu(Rml::Event& event, int key);
+
   void HandleKeyMain(Rml::Event& event, int key);
   void HandleKeyWatch(Rml::Event& event, int key);
 
@@ -172,6 +219,25 @@ private:
   Rml::String bind_watch_time_;
   Rml::String bind_watch_progress_ = "0%"; // data-style-width; never empty
   bool bind_watch_recorded_ = false;       // playing a recording, not live
+  bool bind_watch_paused_ = false;
+  Rml::String bind_watch_ends_;    // "Ends at 21:40"
+  Rml::String bind_watch_seek_;    // seek bubble: "» +2:30"
+  Rml::String bind_watch_seek_at_ = "0%"; // where it rides on the bar
+  Rml::String bind_watch_vtrack_;  // "1080p · H.264"
+  Rml::String bind_watch_atrack_;  // "Swedish · Dolby Digital · 5.1"
+  Rml::String bind_watch_strack_;  // subtitles shown, "" when off
+  Rml::String bind_watch_speed_;   // "1.5×", "" at normal speed
+  Rml::String bind_watch_sleep_;   // "Sleep 25 min", "" when off
+
+  // Menu bindings.
+  bool bind_menu_open_ = false;
+  bool bind_menu_dialog_ = false;  // centered dialog rather than side blade
+  Rml::String bind_menu_title_;
+  Rml::String bind_menu_meta_;
+  Rml::String bind_menu_progress_ = "0%"; // data-style-width; never empty
+  std::vector<MenuRow> menu_rows_;
+  std::vector<MenuItem> menu_items_;
+  int sel_menu_ = 0;
 
   // Connect screen bindings.
   std::vector<ServerRow> server_rows_;
@@ -231,4 +297,21 @@ private:
   bool scroll_epg_pending_ = false;
   bool scroll_rec_pending_ = false;
   bool scroll_server_pending_ = false;
+  bool scroll_menu_pending_ = false;
+
+  // Seek run: how far the presses so far have jumped, how many there were,
+  // and until when the next one still belongs to the run.
+  int64_t seek_accum_us_ = 0;
+  int seek_run_ = 0;
+  double seek_bubble_until_ = 0.0;
+
+  // Resume: when the position was last sent, and what was sent.
+  double position_saved_at_ = 0.0;
+  int64_t position_saved_s_ = -1;
+  int64_t start_position_s_ = 0; // where the recording was started
+
+  // Sleep timer: when playback stops (Now() seconds), 0 = off; and whether
+  // that is the end of the programme on air.
+  double sleep_at_ = 0.0;
+  bool sleep_end_of_programme_ = false;
 };

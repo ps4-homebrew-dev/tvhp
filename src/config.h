@@ -20,6 +20,18 @@ struct ServerProfile {
   bool Valid() const { return !host.empty(); }
 };
 
+// How the player is set up, kept across sessions: the picture and sound
+// adjustments of the playback menu, and the languages last picked, so a
+// subtitle choice follows from channel to channel.
+struct PlayerPrefs {
+  bool night_mode = false;
+  int fit = 0;               // Player::Fit
+  double audio_delay = 0.0;  // seconds
+  double sub_scale = 1.0;
+  std::string audio_lang;    // ISO 639, "" = the stream's default
+  std::string sub_lang;      // "" = subtitles off
+};
+
 // The list of saved servers, persisted to tvhp.cfg (in the working directory
 // on a PC, in the preference folder of the user on a PS4).
 //
@@ -27,6 +39,12 @@ struct ServerProfile {
 // user=/pass= lines, is still read and silently migrated on the next save):
 //
 //   last=1
+//   player.night=0          (PlayerPrefs, before the first [server]; older
+//   player.fit=0             builds read them as an incomplete server and
+//   player.audio_delay=0     drop it)
+//   player.sub_scale=1
+//   player.alang=swe
+//   player.slang=
 //   [server]
 //   name=Living room
 //   host=192.168.1.10
@@ -62,8 +80,12 @@ public:
   void Update(int index, const ServerProfile& profile);
   void Remove(int index);
 
+  PlayerPrefs& Player() { return player_; }
+  const PlayerPrefs& Player() const { return player_; }
+
 private:
   std::vector<ServerProfile> servers_;
+  PlayerPrefs player_;
   int last_used_ = 0;
 };
 

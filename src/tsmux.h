@@ -31,9 +31,10 @@ public:
   ~TsMux();
 
   // Sets the muxer up for the streams of a subscriptionStart and writes the
-  // stream header. Video and audio streams that MPEG-TS can carry are
-  // kept; subtitles, teletext and anything else are left out. Returns a
-  // description like "H264 1280x720 + AC3", empty when nothing is playable.
+  // stream header. Video, audio and DVB subtitle streams that MPEG-TS can
+  // carry are kept; teletext and anything else are left out. Returns a
+  // description like "H264 1280x720 + AC3 + DVB subtitles (swe)", empty
+  // when there is no video or audio to play.
   std::string Start(const std::vector<HtspStreamInfo>& streams);
 
   // Muxes one packet. Packets of streams that were left out are dropped.

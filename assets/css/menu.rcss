@@ -1,0 +1,166 @@
+/*
+ * Playback menu: a side blade over the left edge, opened with the Options
+ * button while watching; or (#menu.dialog) a small dialog in the middle of
+ * the screen for a question that needs an answer first (resume?). Left /
+ * right change a setting in place, cross runs an action, circle closes.
+ *
+ * Taken from jtplay, in tvhp's colours. Row height and margin are mirrored
+ * by kMenuRowPitch in src/app_internal.h.
+ */
+
+/* Over the video the blade only needs a light shade; over the lists the
+ * dialog darkens them so the question stands out. */
+#menu-scrim {
+	z-index: 9;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	right: 0px;
+	bottom: 0px;
+	background-color: #05080f60;
+}
+#menu-scrim.dialog {
+	background-color: #05080fb8;
+}
+
+#menu {
+	z-index: 10;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	bottom: 0px;
+	box-sizing: border-box;
+	width: 640px;
+	padding: 72px 40px;
+	display: flex;
+	flex-direction: column;
+	decorator: linear-gradient(90deg, #141c2e 0%, #10172a 100%);
+	border-right: 2px #ffffff14;
+	box-shadow: #000000a0 20px 0px 60px 0px;
+	animation: 0.18s cubic-out blade-in;
+}
+
+@keyframes blade-in {
+	from { transform: translateX(-80px); opacity: 0; }
+	to   { transform: translateX(0px); opacity: 1; }
+}
+
+.menu-title {
+	margin: 0px 0px 36px 24px;
+	font-size: 30px;
+	font-weight: bold;
+	letter-spacing: 1px;
+	color: #e8edf7;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Long menus scroll; the app keeps the selection in view. */
+#menu-rows {
+	flex: 1;
+	overflow-y: hidden;
+}
+#menu.dialog #menu-rows {
+	flex: none;
+}
+
+.menu-row {
+	box-sizing: border-box;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	height: 72px;
+	margin-bottom: 6px;
+	padding: 0px 24px;
+	border-left: 6px #ffffff00;
+}
+
+.menu-label {
+	flex: 1;
+	font-size: 28px;
+	color: #c5cee0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The value is what changes with left / right: keep it visible. */
+.menu-value {
+	max-width: 330px;
+	font-size: 24px;
+	color: #8593ab;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* The selection in tvhp's way: a lighter row with the amber edge. */
+.menu-row.selected {
+	background-color: #ffffff12;
+	border-left: 6px #f5b453;
+}
+.menu-row.selected .menu-label { color: #ffffff; font-weight: bold; }
+.menu-row.selected .menu-value { color: #f5b453; }
+
+/* ------------------------------------------------------------------ */
+/* Dialog                                                             */
+/* ------------------------------------------------------------------ */
+
+#menu.dialog {
+	left: 50%;
+	top: 50%;
+	bottom: auto;
+	width: 760px;
+	margin-left: -380px;
+	margin-top: -210px;
+	padding: 40px 48px 32px 48px;
+	border-right-width: 0px;
+	border: 1px #ffffff1f;
+	decorator: none;
+	background-color: #10172af0;
+	box-shadow: #000000a0 0px 24px 70px 0px;
+	animation: 0.2s cubic-out dialog-in;
+}
+
+@keyframes dialog-in {
+	from { transform: scale(0.94); opacity: 0; }
+	to   { transform: scale(1); opacity: 1; }
+}
+
+#menu.dialog .menu-title {
+	margin: 0px 0px 28px 0px;
+	font-size: 34px;
+	text-align: center;
+}
+
+#menu.dialog .menu-row {
+	justify-content: center;
+}
+
+#menu.dialog .menu-label {
+	flex: none;
+}
+
+/* Resume: where it was left, as text and as a bar like the player's. */
+.dialog-meta {
+	margin: -18px 0px 0px 0px;
+	font-size: 22px;
+	color: #8593ab;
+	text-align: center;
+}
+
+.dialog-progress {
+	position: relative;
+	height: 6px;
+	margin: 22px 0px 30px 0px;
+	background-color: #ffffff1f;
+}
+
+.dialog-played {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	height: 6px;
+	background-color: #f5b453;
+}

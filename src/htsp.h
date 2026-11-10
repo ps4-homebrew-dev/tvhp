@@ -57,6 +57,11 @@ struct HtspDvrEntry {
   uint32_t season = 0;
   uint32_t episode = 0;
   bool enabled = true;
+  // Where playback was left, in seconds (0 = from the start), and how often
+  // it has been watched to the end. Kept by the server (HTSP 27+), so a
+  // recording resumes where it was left on any client, Kodi included.
+  uint32_t play_position = 0;
+  uint32_t play_count = 0;
 
   bool IsScheduled() const { return state == "scheduled"; }
   bool IsRecording() const { return state == "recording"; }
@@ -76,6 +81,8 @@ struct HtspStreamInfo {
   uint32_t width = 0, height = 0;   // video
   uint32_t channels = 0, rate = 0;  // audio
   std::string language;             // ISO 639-2, "" when not given
+  // DVB subtitles: the pages of the service's subtitles.
+  uint32_t composition_id = 0, ancillary_id = 0;
   // The codec's global header ("meta"), when the server sends one: the
   // AudioSpecificConfig of an AAC stream whose packets carry no ADTS
   // header (DVB-T2's LATM is delivered like this), the avcC of an H.264
@@ -165,6 +172,13 @@ public:
 
   // cancelDvrEntry keeps the entry (and any partial file) but stops or
   // unschedules it; deleteDvrEntry removes the entry and its file.
+  // Saves where playback of a recording was left (seconds; 0 = from the
+  // start) and, with 'watched', counts it as watched to the end. Does not
+  // wait for the reply, so it never holds up the UI; the server confirms
+  // with a dvrEntryUpdate. The local copy changes at once. Nothing is sent
+  // to a server older than HTSP 27, which keeps no position.
+  void SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watched);
+
   bool CancelDvrEntry(uint32_t dvr_id, std::string& error);
   bool DeleteDvrEntry(uint32_t dvr_id, std::string& error);
 
@@ -173,7 +187,7 @@ public:
   struct StreamCallbacks {
     std::function<void(std::vector<HtspStreamInfo>)> on_start;
     std::function<void(HtspMuxPacket&&)> on_packet;
-    std::function<void(std::string)> on_status; // subscriptionStatus / stop reason
+    std::function<void(std::string)> on_status; // subscriptionStatus ("" = all well again) / stop reason
     std::function<void()> on_stop;              // subscriptionStop, after on_status
   };
   void SetStreamCallbacks(StreamCallbacks cbs);
@@ -202,6 +216,7 @@ public:
   std::string ServerInfo() const { return server_info; }
   // Recording playback needs fileOpen, which arrived in HTSP v8.
   bool SupportsFileApi() const { return htsp_version >= 8; }
+  bool SupportsPlayPosition() const { return htsp_version >= 27; }
 
 private:
   // Sends a request and waits for the seq-matched reply (reader thread
