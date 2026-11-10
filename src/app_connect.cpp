@@ -248,7 +248,8 @@ void App::PollConnectState() {
   // The channel icons come over the new connection, into the server's
   // own folder.
   if (const ServerProfile* p = config_.At(connecting_index_))
-    icons_.Start(&client_, p->host + "_" + std::to_string(p->PortNumber()));
+    icons_.Start(&client_, p->host + "_" + std::to_string(p->PortNumber()), p->host, p->user,
+                 p->pass);
   SwitchToMain();
 }
 

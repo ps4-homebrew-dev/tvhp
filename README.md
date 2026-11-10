@@ -34,9 +34,11 @@ connection that carries the channel list and the guide.
   with what plays in the top bar. Select it (or Options → Full screen) to go
   back to it; Back from the top of the menus stops it.
 - **Channel logos** — Tvheadend's own, in the channel list, the guide, the
-  recordings and the player. They come over the HTSP connection (the server's
-  image cache, read with `fileOpen`), so they need no web port or second login,
-  and are kept on the console after the first time.
+  recordings and the player, kept on the console after the first time. With
+  the server's image cache on, they come over the HTSP connection (`fileOpen`);
+  with it off (Tvheadend's default) the server gives their web addresses, which
+  are fetched over http(s), with the server's login when they are on its own
+  host.
 - **Multiple servers** — save as many as you like and switch between them
   without restarting.
 - Designed for a 1920x1080 screen at couch distance: large type, high
@@ -164,9 +166,9 @@ For the PS4, with the ps4-homebrew-dev SDK, the same CMakeLists.txt builds
 
 ## Known limitations
 
-- Channel logos come from Tvheadend's image cache only. With the image cache
-  turned off the server sends their original URLs instead, which are not
-  fetched: those channels show a plain TV symbol.
+- Logos given as `picon://` (picons without a picon folder set on the server)
+  cannot be fetched; those channels show a plain TV symbol. Set the picon path
+  in Tvheadend (Configuration → General → Base) and they come as files.
 - Only programme-based recording is exposed. The client can also schedule a
   manual time range (`HtspClient::RecordTimespan`), but nothing in the UI
   calls it.

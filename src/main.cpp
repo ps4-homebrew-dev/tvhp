@@ -37,6 +37,8 @@ extern "C" int SDL_main(int argc, char* argv[]) {
 #if defined(__SCE__)
   options.assets_dir = "/app0/assets";
   options.fonts_dir = "/app0/fonts";
+  // libcurl's certificates, for channel logos on https (see CMakeLists.txt).
+  ::setenv("SSL_CERT_FILE", "/app0/ca-bundle.crt", 0);
 
   // The saved servers go in the preference folder, which SDL2main puts in
   // $XDG_DATA_HOME: on the title's download data, /download0, for this
