@@ -55,7 +55,7 @@
 #servers {
 	box-sizing: border-box;
 	width: 900px;
-	height: 620px;
+	height: 660px;
 	padding: 24px 24px 18px 24px;
 	background-color: #ffffff06;
 	border: 1px #ffffff10;
@@ -117,6 +117,19 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+/* "Add a server", after the servers: dashed, as something not there yet. */
+.add-row {
+	background-color: transparent;
+	border: 2px #ffffff1c;
+}
+.add-row .srvicon {
+	color: #8593ab;
+	background-color: #ffffff0b;
+}
+.add-row .srvname {
+	color: #aab6cc;
 }
 
 /* The way in, on the selected row. */
@@ -291,11 +304,4 @@ button span {
 	font-size: 23px;
 	text-align: center;
 	color: #ff8f6e;
-}
-
-.connect-hints {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	margin-top: 32px;
 }

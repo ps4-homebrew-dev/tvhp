@@ -66,6 +66,7 @@ void App::RebuildRecordingRows()
 	}
       row.watched = e.HasFile() && e.play_count > 0 && !row.resumable;
       row.playing = bind_watching_ && e.id == playing_dvr_id_;
+      row.icon = IconDecorator(e.channel_id);
       rec_rows_.push_back(std::move(row));
     }
 
@@ -168,37 +169,45 @@ void App::ToggleRecordSelectedEvent()
 
 // destructive == true means deleteDvrEntry (removes the file); false means
 // cancelDvrEntry (unschedules or stops, keeping whatever was recorded).
+// Either is asked about first, in a dialog, as the PS4 does.
 void App::CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive)
 {
-  const double now = Now();
-  if (!(confirm_dvr_id_ == entry.id && now < confirm_deadline_))
+  const uint32_t id = entry.id;
+  const std::string title = entry.title.empty() ? std::string("this recording") : entry.title;
+  std::string question, action;
+  if (destructive)
     {
-      confirm_dvr_id_ = entry.id;
-      confirm_deadline_ = now + kConfirmWindowSec;
-      ShowToast(destructive ? "Press again to delete this recording"
-			    : "Press again to cancel this recording",
+      question = "Delete " + title + "?";
+      action = "Delete";
+    }
+  else if (entry.IsRecording())
+    {
+      question = "Stop recording " + title + "?";
+      action = "Stop recording";
+    }
+  else
+    {
+      question = "Cancel the recording of " + title + "?";
+      action = "Cancel recording";
+    }
+  OpenConfirm(question, destructive ? "The file is removed from the server."
+				    : std::string(), action,
+    [this, id, destructive] {
+      std::string error;
+      const bool ok = destructive ? client_.DeleteDvrEntry(id, error)
+				  : client_.CancelDvrEntry(id, error);
+      if (!ok)
+	{
+	  ShowToast(error.empty() ? "The server refused the request" : error, icon::kWarning);
+	  return;
+	}
+      // If the entry just removed is the one playing, stop first.
+      if (playing_dvr_id_ == id)
+	StopPlayback();
+      ShowToast(destructive ? "Recording deleted" : "Recording cancelled",
 		destructive ? icon::kDelete : icon::kUnschedule);
-      return;
-    }
-  confirm_dvr_id_ = 0;
-  confirm_deadline_ = 0.0;
-
-  std::string error;
-  const bool ok = destructive ? client_.DeleteDvrEntry(entry.id, error)
-			      : client_.CancelDvrEntry(entry.id, error);
-  if (!ok)
-    {
-      ShowToast(error.empty() ? "The server refused the request" : error, icon::kWarning);
-      return;
-    }
-
-  // If the entry we just removed is the one playing, stop first.
-  if (playing_dvr_id_ == entry.id)
-    StopPlayback();
-
-  ShowToast(destructive ? "Recording deleted" : "Recording cancelled",
-	    destructive ? icon::kDelete : icon::kUnschedule);
-  RefreshFromClient(true);
+      RefreshFromClient(true);
+    });
 }
 
 void App::PlaySelectedRecording()

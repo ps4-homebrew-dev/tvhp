@@ -22,6 +22,10 @@ struct HtspChannel {
   uint32_t number = 0;
   std::string name;
   uint32_t event_id = 0;      // current EPG event, 0 = unknown
+  // The channel's logo as the server names it: "imagecache/123" (fetched
+  // with FileOpen, see IconCache), an http URL when the server's image
+  // cache is off, or "" when it has none.
+  std::string icon;
 };
 
 // One EPG event, as pushed by eventAdd/eventUpdate. Times are unix seconds.
@@ -178,6 +182,9 @@ public:
   // with a dvrEntryUpdate. The local copy changes at once. Nothing is sent
   // to a server older than HTSP 27, which keeps no position.
   void SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watched);
+  // Marks a recording watched (counted once, from the start next time) or
+  // unwatched (never played). Like SavePlayPosition, does not wait.
+  void SetWatched(uint32_t dvr_id, bool watched);
 
   bool CancelDvrEntry(uint32_t dvr_id, std::string& error);
   bool DeleteDvrEntry(uint32_t dvr_id, std::string& error);

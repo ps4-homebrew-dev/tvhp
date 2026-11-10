@@ -45,7 +45,8 @@ void App::RebuildServerRows() {
   }
 
   server_count_ = (int)server_rows_.size();
-  sel_server_ = std::clamp(sel_server_, 0, std::max(0, server_count_ - 1));
+  // The row after the servers is "Add a server".
+  sel_server_ = std::clamp(sel_server_, 0, server_count_);
   model_.DirtyVariable("servers");
   model_.DirtyVariable("server_count");
   model_.DirtyVariable("sel_server");
@@ -115,8 +116,8 @@ void App::CloseServerDialog() {
   model_.DirtyVariable("dialog");
   model_.DirtyVariable("dialog_title");
 
-  // Adding was abandoned: put the cursor back on a real row.
-  sel_server_ = std::clamp(sel_server_, 0, std::max(0, server_count_ - 1));
+  // Adding was abandoned: back on the row it was opened from.
+  sel_server_ = std::clamp(sel_server_, 0, server_count_);
   model_.DirtyVariable("sel_server");
 
   SetConnectZone(Zone::ServerList);
@@ -153,24 +154,32 @@ void App::DeleteSelectedServer() {
   const ServerProfile* p = config_.At(sel_server_);
   if (!p)
     return;
+  const int index = sel_server_;
+  OpenConfirm("Delete " + p->Label() + "?", "Its address and login are forgotten.", "Delete",
+    [this, index] {
+      config_.Remove(index);
+      config_.Save(config_path_);
+      sel_server_ = std::min(index, (int)config_.Count());
+      RebuildServerRows();
+      LoadFormFromSelection();
+      ShowToast("Server deleted", icon::kDelete);
+    });
+}
 
-  // Destructive: require a second press on the same row within the window.
-  const double now = Now();
-  if (confirm_server_index_ != sel_server_ || now >= confirm_deadline_) {
-    confirm_server_index_ = sel_server_;
-    confirm_deadline_ = now + kConfirmWindowSec;
-    ShowToast("Press Triangle again to delete " + p->Label(), icon::kDelete);
+// Options on a server: what can be done with it (PS4 style), or on the
+// "Add a server" row, straight to adding one.
+void App::OpenServerMenu() {
+  const ServerProfile* p = config_.At(sel_server_);
+  if (!p) {
+    OpenServerDialog(true);
     return;
   }
-  confirm_server_index_ = -1;
-  confirm_deadline_ = 0.0;
-
-  const std::string name = p->Label();
-  config_.Remove(sel_server_);
-  config_.Save(config_path_);
-  sel_server_ = std::min(sel_server_, (int)config_.Count());
-  RebuildServerRows();
-  LoadFormFromSelection();
+  OpenContextMenu(p->Label(), {
+    {"Connect", nullptr, [this](int) { StartConnect(); }},
+    {"Edit server", nullptr, [this](int) { OpenServerDialog(false); }},
+    {"Delete server", nullptr, [this](int) { DeleteSelectedServer(); }},
+    {"Add a server", nullptr, [this](int) { OpenServerDialog(true); }},
+  });
 }
 
 void App::SetConnectZone(Zone zone) {
@@ -183,7 +192,7 @@ void App::StartConnect() {
 
   const ServerProfile* p = config_.At(sel_server_);
   if (!p) {
-    ShowToast("Press Options to add a server", icon::kAdd);
+    OpenServerDialog(true); // the "Add a server" row
     return;
   }
 
@@ -236,6 +245,10 @@ void App::PollConnectState() {
     config_.SetLastUsed(connecting_index_);
     config_.Save(config_path_);
   }
+  // The channel icons come over the new connection, into the server's
+  // own folder.
+  if (const ServerProfile* p = config_.At(connecting_index_))
+    icons_.Start(&client_, p->host + "_" + std::to_string(p->PortNumber()));
   SwitchToMain();
 }
 
@@ -380,12 +393,13 @@ void App::HandleKeyConnect(Rml::Event& event, int key)
 	  MoveSelection(+1);
 	  break;
 	case keymap::Cmd::Options: // options / the remote's menu button
-	  OpenServerDialog(true);
+	  OpenServerMenu();
 	  break;
+	// Shortcuts for what the Options menu offers.
 	case keymap::Cmd::Secondary: // square: edit this server
 	  OpenServerDialog(false);
 	  break;
-	case keymap::Cmd::Remove: // triangle: forget this server
+	case keymap::Cmd::Remove: // triangle: delete it (after asking)
 	  DeleteSelectedServer();
 	  break;
 	case keymap::Cmd::Ok:

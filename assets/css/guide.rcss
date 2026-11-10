@@ -31,20 +31,40 @@
 	background-color: #ffffff0e;
 }
 
-/* The channel number on a tile of its own. */
+/* The channel number, then its logo on a tile. */
 .chnum {
 	box-sizing: border-box;
 	display: block;
-	width: 84px;
-	height: 64px;
-	margin-right: 22px;
-	padding-top: 10px;
-	font-size: 34px;
+	width: 50px;
+	margin-right: 14px;
+	font-size: 26px;
 	font-weight: bold;
-	text-align: center;
-	color: #8593ab;
+	text-align: right;
+	color: #6f7b92;
+}
+
+.chlogo {
+	box-sizing: border-box;
+	flex-shrink: 0;
+	width: 120px;
+	height: 68px;
+	margin-right: 22px;
+	padding: 10px 14px;
 	background-color: #ffffff0b;
 	border-radius: 12px;
+}
+
+/* No logo (yet): the tile holds a TV. */
+.chlogo.empty {
+	padding: 14px 0px 0px 0px;
+	font-size: 34px;
+	text-align: center;
+	color: #ffffff2e;
+}
+
+.logo-img {
+	width: 100%;
+	height: 100%;
 }
 
 .chinfo {
@@ -113,7 +133,9 @@
 }
 .channel-row.selected .chnum {
 	color: #f5b453;
-	background-color: #f5b45320;
+}
+.channel-row.selected .chlogo {
+	background-color: #ffffff1a;
 }
 .channel-row.selected .chnow,
 .channel-row.selected .chtime {
@@ -127,7 +149,11 @@
 }
 #channels.active .channel-row.selected .chnum {
 	color: #241604;
-	background-color: #00000024;
+}
+/* Logos are drawn for dark backgrounds: on the amber bar, the tile stays
+ * dark. */
+#channels.active .channel-row.selected .chlogo {
+	background-color: #0b1020e0;
 }
 #channels.active .channel-row.selected .chname,
 #channels.active .channel-row.selected .chlive {

@@ -55,6 +55,7 @@ void App::RebuildChannelRows()
 	  row.progress_style = "0%";
 	}
       row.playing = bind_watching_ && ch.id == playing_channel_id_;
+      row.icon = IconDecorator(ch.id);
       channel_rows_.push_back(std::move(row));
     }
 
@@ -68,12 +69,14 @@ void App::RebuildEpgRows()
   epg_rows_.clear();
   epg_events_.clear();
   bind_epg_channel_.clear();
+  bind_epg_icon_ = "none";
 
   if (sel_channel_ >= 0 && sel_channel_ < (int)channels_.size())
     {
       const HtspChannel& ch = channels_[sel_channel_];
       selected_channel_id_ = ch.id;
       bind_epg_channel_ = ch.name;
+      bind_epg_icon_ = IconDecorator(ch.id);
       epg_events_ = client_.GetChannelEvents(ch.id, kMaxEpgRows);
     }
 
@@ -112,6 +115,7 @@ void App::RebuildEpgRows()
 
   model_.DirtyVariable("epg");
   model_.DirtyVariable("epg_channel");
+  model_.DirtyVariable("epg_icon");
   model_.DirtyVariable("sel_epg");
 }
 
@@ -177,4 +181,56 @@ void App::RebuildDetail()
   model_.DirtyVariable("detail_meta");
   model_.DirtyVariable("detail_desc");
   model_.DirtyVariable("detail_rec");
+}
+
+// ---------------------------------------------------------------------------
+// Channel icons
+// ---------------------------------------------------------------------------
+
+Rml::String App::IconDecorator(uint32_t channel_id)
+{
+  for (const HtspChannel& ch : channels_)
+    if (ch.id == channel_id)
+      {
+	const std::string path = icons_.Path(ch.icon);
+	// Quoted, so a path with spaces or parentheses stays one argument;
+	// "contain": logos come in every shape, and none is cropped.
+	return path.empty() ? Rml::String("none")
+			    : Rml::String("image(\"" + path + "\" contain)");
+      }
+  return "none";
+}
+
+void App::ApplyIcons()
+{
+  seen_icons_ = icons_.Generation();
+  bool changed = false;
+  for (size_t i = 0; i < channel_rows_.size() && i < channels_.size(); i++)
+    {
+      const Rml::String icon = IconDecorator(channels_[i].id);
+      changed |= channel_rows_[i].icon != icon;
+      channel_rows_[i].icon = icon;
+    }
+  if (changed)
+    model_.DirtyVariable("channels");
+  changed = false;
+  for (size_t i = 0; i < rec_rows_.size() && i < recordings_.size(); i++)
+    {
+      const Rml::String icon = IconDecorator(recordings_[i].channel_id);
+      changed |= rec_rows_[i].icon != icon;
+      rec_rows_[i].icon = icon;
+    }
+  if (changed)
+    model_.DirtyVariable("recordings");
+  if (sel_channel_ >= 0 && sel_channel_ < (int)channels_.size())
+    {
+      const Rml::String icon = IconDecorator(channels_[sel_channel_].id);
+      if (bind_epg_icon_ != icon)
+	{
+	  bind_epg_icon_ = icon;
+	  model_.DirtyVariable("epg_icon");
+	}
+    }
+  if (bind_watching_)
+    UpdateWatchOverlay();
 }

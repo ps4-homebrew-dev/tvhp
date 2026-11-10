@@ -24,8 +24,9 @@ static void PrintUsage(const char* argv0) {
     "Usage: %s [options]\n"
     "  -a, --assets DIR   RML documents, stylesheets and icons (default: ./assets)\n"
     "  -f, --fonts DIR    fonts (default: ./fonts)\n"
-    "  -c, --config FILE  saved servers (default: ./tvhp.cfg, or the\n"
-    "                     preference folder of the user on a PS4)\n"
+    "  -c, --config FILE  saved servers (default: ./tvhp.cfg; on a PS4 in\n"
+    "                     the preference folder, under /download0)\n"
+    "  -C, --cache DIR    channel icons (default: $XDG_CACHE_HOME/tvhp)\n"
     "  -h, --help         this text\n",
     argv0);
 }
@@ -37,7 +38,10 @@ extern "C" int SDL_main(int argc, char* argv[]) {
   options.assets_dir = "/app0/assets";
   options.fonts_dir = "/app0/fonts";
 
-  // The saved servers are kept for each user.
+  // The saved servers go in the preference folder, which SDL2main puts in
+  // $XDG_DATA_HOME: on the title's download data, /download0, for this
+  // non-game app (see CMakeLists.txt), where they outlive the app and its
+  // updates.
   if (char* pref = SDL_GetPrefPath("", "tvhp")) {
     options.config_path = std::string(pref) + "tvhp.cfg";
     SDL_free(pref);
@@ -49,6 +53,13 @@ extern "C" int SDL_main(int argc, char* argv[]) {
   options.assets_dir = cwd + "/assets";
   options.fonts_dir = cwd + "/fonts";
 #endif
+
+  // The channel icons: $XDG_CACHE_HOME/tvhp (on the PS4 also in
+  // /download0), or ~/.cache/tvhp.
+  if (const char* cache = std::getenv("XDG_CACHE_HOME"); cache && *cache)
+    options.cache_dir = std::string(cache) + "/tvhp";
+  else if (const char* home = std::getenv("HOME"); home && *home)
+    options.cache_dir = std::string(home) + "/.cache/tvhp";
 
   for (int i = 1; i < argc; i++) {
     auto arg = [&](const char* s, const char* l) {
@@ -63,12 +74,17 @@ extern "C" int SDL_main(int argc, char* argv[]) {
       options.fonts_dir = argv[++i];
     } else if (arg("-c", "--config") && i + 1 < argc) {
       options.config_path = argv[++i];
+    } else if (arg("-C", "--cache") && i + 1 < argc) {
+      options.cache_dir = argv[++i];
     } else {
       std::fprintf(stderr, "%s: unknown option '%s'\n", argv[0], argv[i]);
       PrintUsage(argv[0]);
       return 1;
     }
   }
+
+  std::fprintf(stderr, "tvhp: servers in %s, icons in %s\n", options.config_path.c_str(),
+               options.cache_dir.empty() ? "(none)" : options.cache_dir.c_str());
 
   Rml::Context* ctx;
   std::string err;

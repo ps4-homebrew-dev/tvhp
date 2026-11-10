@@ -20,6 +20,7 @@ App::~App() = default;
 
 bool App::Initialize(Rml::Context* context, const Options& options, std::string& error) {
   config_path_ = options.config_path;
+  icons_.SetRoot(options.cache_dir.empty() ? std::string() : options.cache_dir + "/icons");
   config_.Load(config_path_);
   sel_server_ = config_.LastUsed();
 
@@ -59,6 +60,7 @@ void App::Shutdown() {
   if (connect_thread_.joinable())
     connect_thread_.join();
 
+  icons_.Stop();
   if (player_) {
     // How far a recording got goes to the server while it is still there.
     SaveRecordingPosition();
@@ -95,6 +97,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     row.RegisterMember("now_time", &ChannelRow::now_time);
     row.RegisterMember("progress_style", &ChannelRow::progress_style);
     row.RegisterMember("has_now", &ChannelRow::has_now);
+    row.RegisterMember("icon", &ChannelRow::icon);
     row.RegisterMember("playing", &ChannelRow::playing);
   }
   ctor.RegisterArray<std::vector<ChannelRow>>();
@@ -116,6 +119,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     row.RegisterMember("pending", &RecRow::pending);
     row.RegisterMember("failed", &RecRow::failed);
     row.RegisterMember("progress", &RecRow::progress);
+    row.RegisterMember("icon", &RecRow::icon);
     row.RegisterMember("resumable", &RecRow::resumable);
     row.RegisterMember("watched", &RecRow::watched);
     row.RegisterMember("playing", &RecRow::playing);
@@ -157,6 +161,8 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
   ctor.Bind("channel_count", &channel_count_);
   ctor.Bind("rec_count", &rec_count_);
   ctor.Bind("epg_channel", &bind_epg_channel_);
+  ctor.Bind("epg_icon", &bind_epg_icon_);
+  ctor.Bind("watch_icon", &bind_watch_icon_);
   ctor.Bind("detail_title", &bind_detail_title_);
   ctor.Bind("detail_meta", &bind_detail_meta_);
   ctor.Bind("detail_desc", &bind_detail_desc_);
@@ -281,6 +287,7 @@ void App::SwitchToMain() {
 // when already disconnected.
 void App::DisconnectToLogin() {
   StopPlayback();
+  icons_.Stop();
   client_.Disconnect();
   seen_generation_ = 0;
   channels_.clear();
@@ -299,6 +306,7 @@ void App::DisconnectToLogin() {
 
 void App::SwitchToConnect(const std::string& status) {
   StopPlayback();
+  icons_.Stop(); // before the next Connect() reuses the client
   view_ = View::Connect;
   bind_view_ = "connect";
   bind_status_ = status;
@@ -364,6 +372,8 @@ void App::Update() {
       return;
     }
     RefreshFromClient(false);
+    if (icons_.Generation() != seen_icons_)
+      ApplyIcons();
   }
 
   if (bind_watching_ && player_)
@@ -531,9 +541,8 @@ void App::MoveSelection(int delta)
     {
     case Zone::ServerList:
       {
-	if (server_rows_.empty())
-	  return;
-	const int next = StepIndex(sel_server_, delta, (int)server_rows_.size());
+	// The servers, and "Add a server" after them.
+	const int next = StepIndex(sel_server_, delta, (int)server_rows_.size() + 1);
 	if (next == sel_server_)
 	  return;
 	sel_server_ = next;
@@ -775,8 +784,13 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	}
       break;
 
-    // Triangle removes the highlighted recording. It does nothing anywhere
-    // else, so a stray press from the couch is harmless.
+    // Options: what can be done with what is selected (PS4 style).
+    case keymap::Cmd::Options:
+      OpenOptionsMenu();
+      break;
+
+    // Triangle removes the highlighted recording, after asking: a shortcut
+    // for the Options menu's Delete. It does nothing anywhere else.
     case keymap::Cmd::Remove:
       if (section_ != Section::Recordings)
 	return;

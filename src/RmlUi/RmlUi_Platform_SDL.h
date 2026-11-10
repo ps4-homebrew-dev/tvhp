@@ -28,6 +28,10 @@ public:
 
 	void SetMouseCursor(const Rml::String& cursor_name) override;
 
+	// tvhp (from jtplay): keeps Unix-absolute paths ("/download0/..."), which
+	// RmlUi would otherwise strip.
+	void JoinPath(Rml::String& translated_path, const Rml::String& document_path, const Rml::String& path) override;
+
 	void SetClipboardText(const Rml::String& text) override;
 	void GetClipboardText(Rml::String& text) override;
 

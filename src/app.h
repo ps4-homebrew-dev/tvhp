@@ -11,6 +11,7 @@
 
 #include "config.h"
 #include "htsp.h"
+#include "iconcache.h"
 #include "player.h"
 
 // Owns the HTSP client, the player and the RmlUi document, and mediates
@@ -26,6 +27,7 @@ public:
     std::string config_path = "tvhp.cfg";
     std::string assets_dir = "assets";
     std::string fonts_dir = "fonts";
+    std::string cache_dir;  // channel icons; "" = not kept
   };
 
   // Creates the data model and loads main.rml from the assets. Must be
@@ -67,6 +69,7 @@ private:
     Rml::String now_title;
     Rml::String now_time;
     Rml::String progress_style; // "42%", bound via data-style-width
+    Rml::String icon = "none";  // the logo, as a decorator (IconDecorator)
     bool has_now = false;
     bool playing = false; // the channel that plays (behind the menus)
   };
@@ -83,6 +86,7 @@ private:
     Rml::String meta;    // "SVT1  -  Today 20:00"
     Rml::String state;   // "Recording", "Scheduled", "Failed", duration...
     Rml::String progress = "0%"; // how far it was watched; data-style-width
+    Rml::String icon = "none";   // its channel's logo, as a decorator
     bool pending = false;
     bool failed = false;
     bool resumable = false; // left part-way: the progress bar shows
@@ -118,6 +122,7 @@ private:
   void StartConnect();
   void PollConnectState();
   void DeleteSelectedServer();
+  void OpenServerMenu();
   void SetConnectZone(Zone zone);
   int CurrentFormRow(bool* in_input) const;
   void FocusFormField(int delta);  // up/down: label -> label, input -> input
@@ -170,6 +175,13 @@ private:
   // Options menu's "Full screen") goes back to it, and Back from the top of
   // the menus stops it.
   void SetFullscreen(bool on);
+
+  // --- Channel icons --------------------------------------------------------
+  // The logo of a channel as an RmlUi decorator ("image(...) contain"), or
+  // "none" while there is none (yet: IconCache fetches it).
+  Rml::String IconDecorator(uint32_t channel_id);
+  // Icons have arrived: the rows, the guide and the player show them.
+  void ApplyIcons();
   bool VideoBehind() const { return bind_watching_ && !bind_fullscreen_; }
   // The list rows of what plays, marked as such.
   void MarkPlayingRows();
@@ -200,6 +212,15 @@ private:
   // a side blade, or a small dialog in the middle of the screen.
   void OpenWatchMenu();
   void OpenResumeDialog(const HtspDvrEntry& entry);
+  // The Options button on the guide or the recordings (PS4 style): what can
+  // be done with what is selected. Over a video playing behind the menus,
+  // the playback menu instead.
+  void OpenOptionsMenu();
+  // A menu of plain actions (no settings), titled for what it is about.
+  void OpenContextMenu(const std::string& title, std::vector<MenuItem> items);
+  // "Delete X?": the action, and Cancel. 'detail' says what it means.
+  void OpenConfirm(const std::string& question, const std::string& detail,
+		   const std::string& action, std::function<void()> run);
   void CloseMenu();
   void RebuildMenuRows();
   void HandleKeyMenu(Rml::Event& event, int key);
@@ -221,6 +242,8 @@ private:
   Rml::String bind_toast_icon_;
   Rml::String bind_toast_;
   Rml::String bind_epg_channel_;  // heading of the guide pane
+  Rml::String bind_epg_icon_ = "none";   // its channel's logo
+  Rml::String bind_watch_icon_ = "none"; // the logo of the channel playing
   Rml::String bind_detail_title_;
   Rml::String bind_detail_meta_;
   Rml::String bind_detail_desc_;
@@ -250,7 +273,7 @@ private:
   bool bind_menu_dialog_ = false;  // centered dialog rather than side blade
   Rml::String bind_menu_title_;
   Rml::String bind_menu_meta_;
-  Rml::String bind_menu_progress_ = "0%"; // data-style-width; never empty
+  Rml::String bind_menu_progress_ = "0%"; // data-style-width; "0%" = no bar
   std::vector<MenuRow> menu_rows_;
   std::vector<MenuItem> menu_items_;
   int sel_menu_ = 0;
@@ -286,6 +309,8 @@ private:
   ServerConfig config_;
   HtspClient client_;
   std::unique_ptr<Player> player_;
+  IconCache icons_;
+  uint64_t seen_icons_ = 0;
   std::string config_path_;
   Rml::ElementDocument* document_ = nullptr;
 
@@ -306,9 +331,6 @@ private:
   double last_refresh_time_ = 0.0;
   double toast_deadline_ = 0.0;
   double info_deadline_ = 0.0; // watch info bar auto-hide
-  double confirm_deadline_ = 0.0; // double-press-to-delete window
-  uint32_t confirm_dvr_id_ = 0;
-  int confirm_server_index_ = -1;
   bool scroll_channels_pending_ = false;
   bool scroll_epg_pending_ = false;
   bool scroll_rec_pending_ = false;

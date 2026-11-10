@@ -61,6 +61,17 @@ double SystemInterface_SDL::GetElapsedTime()
 	return double(SDL_GetPerformanceCounter() - start) / frequency;
 }
 
+void SystemInterface_SDL::JoinPath(Rml::String& translated_path, const Rml::String& document_path, const Rml::String& path)
+{
+	// Keep Unix-absolute paths intact (the channel icons)
+	if (!path.empty() && path[0] == '/')
+	{
+		translated_path = path;
+		return;
+	}
+	Rml::SystemInterface::JoinPath(translated_path, document_path, path);
+}
+
 void SystemInterface_SDL::SetMouseCursor(const Rml::String& cursor_name)
 {
 	SDL_Cursor* cursor = nullptr;

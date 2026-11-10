@@ -25,6 +25,7 @@ add_executable(tvhp
     src/format.cpp
     src/gamepad.cpp
     src/htsp.cpp
+    src/iconcache.cpp
     src/player.cpp
     src/tsmux.cpp
     src/RmlUi/RmlUi_Backend_SDL_GL3.cpp
@@ -66,9 +67,20 @@ if(ORBIS)
     pkg_check_modules(GL REQUIRED gl)
     pkg_check_modules(VULKAN REQUIRED vulkan)
 
+    # A non-game application ("gdc"), as jtplay is: a PS5 running it as a
+    # PS4 app treats it as a media app, and only that gets the remote's media
+    # keys there. A non-game has no /temp0 (temporary data, games only), so
+    # it asks for download data instead, mounted at /download0, where
+    # SDL2main (pacbrew 0.8.7 and later) puts the XDG base directories: the
+    # saved servers and settings, the channel icons, Mesa's shader cache.
+    # Its size is in MiB. The content ID is the one earlier versions got by
+    # default, so a new package installs over an old one.
     orbis_add_pkg(tvhp
         TITLE tvhp
         TITLE_ID BREW04328
+        CONTENT_ID IV0000-BREW04328_00-TVHP000000000000
+        CATEGORY gdc
+        DOWNLOAD_DATA_SIZE 128
         ASSETS sce_sys assets fonts
         MODULES libEGL.so.1 libGL.so.1 libgallium-${EGL_VERSION}.so libvulkan.so.1
     )

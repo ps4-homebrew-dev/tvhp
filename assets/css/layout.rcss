@@ -1,6 +1,8 @@
 /*
  * Main screen scaffold: topbar (tabs, now playing, clock), content columns,
- * footer, the generic pane/list chrome each view sits in, and the toast.
+ * the generic pane/list chrome each view sits in, and the toast. There are
+ * no button hints, as on the PS4's own screens: cross selects, circle goes
+ * back, and the Options button opens a menu with everything else.
  */
 
 /* Above the video shade, which is positioned. */
@@ -146,6 +148,13 @@
 	text-overflow: ellipsis;
 }
 
+.np-chip-logo {
+	flex-shrink: 0;
+	width: 64px;
+	height: 34px;
+	margin-right: 14px;
+}
+
 .np-chip-bar {
 	position: absolute;
 	left: 24px;
@@ -182,7 +191,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Content and footer                                                 */
+/* Content                                                            */
 /* ------------------------------------------------------------------ */
 
 #content {
@@ -190,46 +199,8 @@
 	display: flex;
 	flex-direction: row;
 	flex: 1;
-	padding: 0px 64px;
+	padding: 0px 64px 48px 64px;
 	overflow: hidden;
-}
-
-#footer {
-	box-sizing: border-box;
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	height: 92px;
-	padding: 0px 64px;
-}
-
-.hint {
-	display: inline-block;
-	margin-left: 12px;
-	margin-right: 32px;
-	font-size: 21px;
-	color: #6a7488;
-}
-
-/* PlayStation-style key hint icons (cross, square, triangle). The source art
- * is 128x128, so these scale up cleanly. */
-.key-icon {
-	display: inline-block;
-	width: 48px;
-	height: 48px;
-	vertical-align: middle;
-}
-
-/* A button without icon art: its name on a keycap. */
-.keycap {
-	padding: 5px 12px;
-	font-size: 16px;
-	font-weight: bold;
-	letter-spacing: 2px;
-	color: #c5cee0;
-	border: 2px #8593ab;
-	border-radius: 8px;
-	white-space: nowrap;
 }
 
 /* ------------------------------------------------------------------ */
@@ -344,6 +315,11 @@
 	animation: 0.25s cubic-out toast-in;
 }
 
+/* The Options menu is on the right: notices keep clear of it. */
+body.blade #toast {
+	right: 700px;
+}
+
 @keyframes toast-in {
 	from { opacity: 0; transform: translateX(40px); }
 	to   { opacity: 1; transform: translateX(0px); }
@@ -359,4 +335,11 @@
 	font-size: 26px;
 	font-weight: bold;
 	color: #e8edf7;
+}
+
+/* A channel's logo as a heading, after GUIDE. */
+.headlogo {
+	width: 72px;
+	height: 36px;
+	margin-left: 18px;
 }

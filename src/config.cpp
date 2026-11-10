@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <fstream>
 
@@ -146,7 +147,10 @@ void ServerConfig::Load(const std::string& path)
 
 bool ServerConfig::Save(const std::string& path) const
 {
-  std::ofstream f(path, std::ios::trunc);
+  // Written beside it, then renamed over it: the app closed half-way (the
+  // PS button) leaves the old file, never half a new one.
+  const std::string tmp = path + ".new";
+  std::ofstream f(tmp, std::ios::trunc);
   if (!f)
     return false;
 
@@ -167,6 +171,12 @@ bool ServerConfig::Save(const std::string& path) const
 	<< "port=" << p.port << "\n"
 	<< "user=" << p.user << "\n"
 	<< "pass=" << p.pass << "\n";
+    }
+  f.close();
+  if (!f || std::rename(tmp.c_str(), path.c_str()) != 0)
+    {
+      std::remove(tmp.c_str());
+      return false;
     }
   return true;
 }

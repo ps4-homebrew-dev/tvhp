@@ -445,6 +445,9 @@ void App::UpdateWatchOverlay()
   if (Now() > seek_bubble_until_)
     set(bind_watch_seek_, Rml::String(), "watch_seek");
   set(bind_watch_num_, num, "watch_num");
+  set(bind_watch_icon_, recorded || !playing_channel_id_ ? Rml::String("none")
+					     : IconDecorator(playing_channel_id_),
+      "watch_icon");
   set(bind_watch_name_, name, "watch_name");
   set(bind_watch_now_, now_title, "watch_now");
   set(bind_watch_time_, now_time, "watch_time");
@@ -650,6 +653,7 @@ void App::OpenWatchMenu()
   menu_items_.clear();
   bind_menu_title_ = recorded ? "Playback" : "Live TV";
   bind_menu_meta_.clear();
+  bind_menu_progress_ = "0%";
   bind_menu_dialog_ = false;
 
   // Behind the menus: the way back to the picture, first.
@@ -794,6 +798,128 @@ void App::OpenResumeDialog(const HtspDvrEntry& entry)
   RebuildMenuRows();
   bind_menu_open_ = true;
   model_.DirtyVariable("menu_open");
+}
+
+void App::OpenContextMenu(const std::string& title, std::vector<MenuItem> items)
+{
+  if (items.empty())
+    return;
+  menu_items_ = std::move(items);
+  bind_menu_title_ = title;
+  bind_menu_meta_.clear();
+  bind_menu_progress_ = "0%";
+  bind_menu_dialog_ = false;
+  model_.DirtyVariable("menu_title");
+  model_.DirtyVariable("menu_meta");
+  model_.DirtyVariable("menu_progress");
+  model_.DirtyVariable("menu_dialog");
+  sel_menu_ = 0;
+  RebuildMenuRows();
+  bind_menu_open_ = true;
+  model_.DirtyVariable("menu_open");
+}
+
+void App::OpenConfirm(const std::string& question, const std::string& detail,
+		      const std::string& action, std::function<void()> run)
+{
+  menu_items_.clear();
+  menu_items_.push_back({action, nullptr, [run](int) { run(); }});
+  menu_items_.push_back({"Cancel", nullptr, [](int) {}});
+  bind_menu_title_ = question;
+  bind_menu_meta_ = detail;
+  bind_menu_progress_ = "0%";
+  bind_menu_dialog_ = true;
+  model_.DirtyVariable("menu_title");
+  model_.DirtyVariable("menu_meta");
+  model_.DirtyVariable("menu_progress");
+  model_.DirtyVariable("menu_dialog");
+  sel_menu_ = 0;
+  RebuildMenuRows();
+  bind_menu_open_ = true;
+  model_.DirtyVariable("menu_open");
+}
+
+// Options on the guide or the recordings: the selected item's actions, as
+// the PS4's own Options menu has them; then where else to go.
+void App::OpenOptionsMenu()
+{
+  if (VideoBehind())
+    {
+      OpenWatchMenu();
+      return;
+    }
+
+  std::vector<MenuItem> items;
+  std::string title;
+  if (section_ == Section::Recordings)
+    {
+      if (const HtspDvrEntry* e = SelectedRecording())
+	{
+	  const HtspDvrEntry entry = *e;
+	  title = entry.title.empty() ? "Recording" : entry.title;
+	  if (entry.HasFile())
+	    {
+	      if (client_.SupportsPlayPosition() && entry.play_position >= kMinResumeSec)
+		{
+		  const int64_t at = entry.play_position;
+		  items.push_back({"Resume from " + FmtPosition(at * 1000000), nullptr,
+		    [this, entry, at](int) { StartRecording(entry.id, at); }});
+		  items.push_back({"Play from beginning", nullptr,
+		    [this, entry](int) { StartRecording(entry.id, 0); }});
+		}
+	      else
+		{
+		  items.push_back({"Play", nullptr, [this, entry](int) { StartRecording(entry.id, 0); }});
+		}
+	      if (client_.SupportsPlayPosition())
+		{
+		  const bool watched = entry.play_count > 0 && entry.play_position < kMinResumeSec;
+		  items.push_back({watched ? "Mark as unwatched" : "Mark as watched", nullptr,
+		    [this, entry, watched](int) {
+		      client_.SetWatched(entry.id, !watched);
+		      ShowToast(watched ? "Marked as unwatched" : "Marked as watched", icon::kDone);
+		      RefreshFromClient(true);
+		    }});
+		}
+	    }
+	  if (entry.IsPending())
+	    items.push_back({entry.IsRecording() ? "Stop recording" : "Cancel recording", nullptr,
+	      [this, entry](int) { CancelOrDeleteRecording(entry, false); }});
+	  else
+	    items.push_back({"Delete", nullptr,
+	      [this, entry](int) { CancelOrDeleteRecording(entry, true); }});
+	}
+      items.push_back({"Guide", nullptr, [this](int) { SetSection(Section::Channels); }});
+    }
+  else
+    {
+      const HtspChannel* ch = sel_channel_ >= 0 && sel_channel_ < (int)channels_.size()
+			      ? &channels_[sel_channel_] : nullptr;
+      if (zone_ == Zone::Epg && sel_epg_ >= 0 && sel_epg_ < (int)epg_events_.size())
+	{
+	  const HtspEvent ev = epg_events_[sel_epg_];
+	  title = ev.title.empty() ? "Programme" : ev.title;
+	  HtspDvrEntry entry;
+	  const bool have = client_.GetDvrEntryForEvent(ev.id, &entry);
+	  if (have && entry.IsPending())
+	    items.push_back({entry.IsRecording() ? "Stop recording" : "Cancel recording", nullptr,
+	      [this, entry](int) { CancelOrDeleteRecording(entry, false); }});
+	  else if (!(have && entry.IsFinished()))
+	    items.push_back({"Record", nullptr, [this](int) { ToggleRecordSelectedEvent(); }});
+	}
+      else if (ch)
+	{
+	  title = ch->name;
+	}
+      if (ch)
+	{
+	  const uint32_t id = ch->id;
+	  items.push_back({"Watch " + ch->name, nullptr, [this, id](int) { PlayChannel(id); }});
+	}
+      items.push_back({"Recordings", nullptr, [this](int) { SetSection(Section::Recordings); }});
+    }
+  items.push_back({"Switch server", nullptr, [this](int) { DisconnectToLogin(); }});
+  OpenContextMenu(title.empty() ? std::string("Options") : title, std::move(items));
 }
 
 void App::CloseMenu()

@@ -23,7 +23,6 @@ inline constexpr float kMenuRowPitch = 72.0f + 6.0f;
 inline constexpr size_t kMaxEpgRows = 80;
 inline constexpr double kRefreshIntervalSec = 20.0; // progress bars, clock drift
 inline constexpr double kToastSec = 4.0;
-inline constexpr double kConfirmWindowSec = 5.0;    // destructive double-press
 inline constexpr double kWatchInfoSec = 5.0;        // watch info bar auto-hide
 
 inline constexpr int64_t kSeekLargeUs = 300 * 1000000LL;

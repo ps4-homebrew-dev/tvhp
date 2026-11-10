@@ -42,6 +42,8 @@ namespace {
 
   // updateDvrEntry / fileClose "playcount": not a count but what to do with
   // it (Tvheadend's HTSP_DVR_PLAYCOUNT_*).
+  constexpr uint32_t kPlayCountReset = 0;
+  constexpr uint32_t kPlayCountSet = 1; // 1 unless counted already
   constexpr uint32_t kPlayCountKeep = 0x7ffffffe;
   constexpr uint32_t kPlayCountIncrement = 0x7fffffff;
   // fileRead can carry up to a megabyte of payload and may have to wait for
@@ -350,6 +352,8 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	ch.number = u32;
       if (const char* name = htsmsg_get_str(msg, "channelName"))
 	ch.name = name;
+      if (const char* icon = htsmsg_get_str(msg, "channelIcon"))
+	ch.icon = icon;
       if (!htsmsg_get_u32(msg, "eventId", &u32))
 	ch.event_id = u32;
       generation++;
@@ -932,6 +936,37 @@ void HtspClient::SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watche
   if (watched)
     htsmsg_add_u32(msg, "playcount", kPlayCountIncrement);
   // A sequence number nobody waits for: the reader drops the reply.
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex);
+    htsmsg_add_u32(msg, "seq", next_seq++);
+  }
+  std::string error;
+  if (!SendMessage(msg, error))
+    std::fprintf(stderr, "htsp updateDvrEntry: %s\n", error.c_str());
+}
+
+void HtspClient::SetWatched(uint32_t dvr_id, bool watched)
+{
+  if (!running || !SupportsPlayPosition())
+    return;
+  {
+    std::lock_guard<std::mutex> lock(channels_mutex);
+    auto it = dvr.find(dvr_id);
+    if (it != dvr.end())
+      {
+	it->second.play_position = 0;
+	if (!watched)
+	  it->second.play_count = 0;
+	else if (!it->second.play_count)
+	  it->second.play_count = 1;
+	generation++;
+      }
+  }
+  htsmsg_t* msg = htsmsg_create_map();
+  htsmsg_add_str(msg, "method", "updateDvrEntry");
+  htsmsg_add_u32(msg, "id", dvr_id);
+  htsmsg_add_u32(msg, "playposition", 0);
+  htsmsg_add_u32(msg, "playcount", watched ? kPlayCountSet : kPlayCountReset);
   {
     std::lock_guard<std::mutex> lock(pending_mutex);
     htsmsg_add_u32(msg, "seq", next_seq++);

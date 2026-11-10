@@ -33,6 +33,10 @@ connection that carries the channel list and the guide.
   guide or the recordings up over the picture, which plays on behind them,
   with what plays in the top bar. Select it (or Options → Full screen) to go
   back to it; Back from the top of the menus stops it.
+- **Channel logos** — Tvheadend's own, in the channel list, the guide, the
+  recordings and the player. They come over the HTSP connection (the server's
+  image cache, read with `fileOpen`), so they need no web port or second login,
+  and are kept on the console after the first time.
 - **Multiple servers** — save as many as you like and switch between them
   without restarting.
 - Designed for a 1920x1080 screen at couch distance: large type, high
@@ -41,6 +45,13 @@ connection that carries the channel list and the guide.
   which takes the GPU (Mesa over Vulkan on the console).
 
 ## Controls
+
+As on the PS4's own screens there are no button hints: Cross selects, Circle
+goes back, and the **Options** button opens a menu, on the right, with what can
+be done with what is selected — record or cancel a recording, play from where it
+was left or from the start, mark as watched, delete (after asking), edit or
+delete a server, switch server. While something plays, Options opens the
+playback settings instead. Square and Triangle are kept as shortcuts.
 
 `tvhp` can be driven from a game controller (the DualShock 4 on a PS4, any pad
 SDL knows on a PC), from a remote control or multimedia keyboard, or from an
@@ -53,12 +64,12 @@ command is reachable from any of them; the pad mapping lives in
 | Navigate | D-pad, left stick (held: repeats) | D-pad | Arrows |
 | Page up / down | L1 / R1 | P+ / P- | Page Up / Page Down |
 | First / last row | L2 / R2 | — | Home / End |
-| Select, record, play/pause | Cross | Enter | Enter |
+| Select: connect, watch, record, play; play/pause | Cross | Enter | Enter |
+| What can be done with it (menu) | Options (or hold Cross) | Menu (or hold OK) | Insert (or hold Enter) |
 | Back, cancel; from full screen: the menus, playing on | Circle | Back | Escape, Backspace |
 | Back to full screen | Cross on what plays, or Options → Full screen | Enter | Enter |
 | Guide ↔ recordings, info bar | Square | Display | Tab |
-| Delete recording or server | Triangle | Red | Delete |
-| Add a server; playback menu while watching | Options (or hold Cross) | Menu (or hold OK) | Insert (or hold Enter) |
+| Delete recording or server (asks) | Triangle | Red | Delete |
 | Next audio track | — | Audio | F2 |
 | Jump to the guide | Back/select (not on a PS4) | Guide | F9 |
 | Play / pause | Cross | Play, Pause | Space |
@@ -85,8 +96,20 @@ Download `IV0000-BREW04328_00-TVHP000000000000.pkg` from the
 [releases page][releases] (or build it, below) and install it with your
 package installer. `TVHP` then appears on the home screen.
 
-The saved servers are kept for each user, in `tvhp/tvhp.cfg` under the user's
-folder in `$XDG_CONFIG_HOME` (the title's temporary data, `/temp0`).
+The package is a non-game application (param.sfo category `gdc`), as jtplay
+is: a PS5 running it treats it as a media app, which is what gets it the
+remote's media keys. Its data is in the title's download data, `/download0`
+(128 MiB), where SDL2main puts the XDG base directories: the saved servers and
+player settings in `/download0/.data/tvhp/tvhp.cfg`, the channel logos in
+`/download0/.cache/tvhp/icons/`, Mesa's shader cache beside them. This needs
+the ps4-homebrew-dev SDK 0.8.7 or later (its SDL2main patch
+`0006-ps4-SDL2main-the-XDG-base-directories-in-download0`); built with an
+older one, they end up in `common_temp`, which all homebrew shares. Where they
+went is printed at startup (`tvhp: servers in ...`).
+
+Versions before this one were packaged as a game and kept the servers in
+`/temp0`, which a non-game cannot reach: add your server again once after
+updating.
 
 [releases]: ../../releases
 
@@ -140,7 +163,9 @@ For the PS4, with the ps4-homebrew-dev SDK, the same CMakeLists.txt builds
 
 ## Known limitations
 
-- Channel icons are fetched from the server but not displayed yet.
+- Channel logos come from Tvheadend's image cache only. With the image cache
+  turned off the server sends their original URLs instead, which are not
+  fetched: those channels show a plain TV symbol.
 - Only programme-based recording is exposed. The client can also schedule a
   manual time range (`HtspClient::RecordTimespan`), but nothing in the UI
   calls it.
