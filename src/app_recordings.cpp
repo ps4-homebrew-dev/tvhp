@@ -6,6 +6,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "icons.h"
 #include "format.h"
 
 using namespace appdetail;
@@ -64,6 +65,7 @@ void App::RebuildRecordingRows()
 	  row.progress = pct;
 	}
       row.watched = e.HasFile() && e.play_count > 0 && !row.resumable;
+      row.playing = bind_watching_ && e.id == playing_dvr_id_;
       rec_rows_.push_back(std::move(row));
     }
 
@@ -146,19 +148,19 @@ void App::ToggleRecordSelectedEvent()
     }
   if (have && entry.IsFinished())
     {
-      ShowToast("Already recorded - see Recordings");
+      ShowToast("Already recorded - see Recordings", icon::kFilm);
       return;
     }
 
   std::string error;
   if (!client_.RecordEvent(ev.id, error))
     {
-      ShowToast(error.empty() ? "The server refused to schedule it" : error);
+      ShowToast(error.empty() ? "The server refused to schedule it" : error, icon::kWarning);
       return;
     }
 
   const std::string title = ev.title.empty() ? std::string("programme") : ev.title;
-  ShowToast("Recording scheduled: " + title);
+  ShowToast("Recording scheduled: " + title, icon::kScheduled);
   // The dvrEntryAdd push will refresh the list, but update the badge now so
   // the press feels immediate.
   RefreshFromClient(true);
@@ -174,7 +176,8 @@ void App::CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive)
       confirm_dvr_id_ = entry.id;
       confirm_deadline_ = now + kConfirmWindowSec;
       ShowToast(destructive ? "Press again to delete this recording"
-			    : "Press again to cancel this recording");
+			    : "Press again to cancel this recording",
+		destructive ? icon::kDelete : icon::kUnschedule);
       return;
     }
   confirm_dvr_id_ = 0;
@@ -185,7 +188,7 @@ void App::CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive)
 			      : client_.CancelDvrEntry(entry.id, error);
   if (!ok)
     {
-      ShowToast(error.empty() ? "The server refused the request" : error);
+      ShowToast(error.empty() ? "The server refused the request" : error, icon::kWarning);
       return;
     }
 
@@ -193,7 +196,8 @@ void App::CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive)
   if (playing_dvr_id_ == entry.id)
     StopPlayback();
 
-  ShowToast(destructive ? "Recording deleted" : "Recording cancelled");
+  ShowToast(destructive ? "Recording deleted" : "Recording cancelled",
+	    destructive ? icon::kDelete : icon::kUnschedule);
   RefreshFromClient(true);
 }
 
@@ -202,15 +206,21 @@ void App::PlaySelectedRecording()
   const HtspDvrEntry* e = SelectedRecording();
   if (!e)
     return;
+  // The recording that plays behind the menus: back to it.
+  if (VideoBehind() && e->id == playing_dvr_id_)
+    {
+      SetFullscreen(true);
+      return;
+    }
   if (!e->HasFile())
     {
       ShowToast(e->IsScheduled() ? "This recording hasn't started yet"
-				 : "There is no file for this recording");
+				 : "There is no file for this recording", icon::kWarning);
       return;
     }
   if (!client_.SupportsFileApi())
     {
-      ShowToast("This server is too old to stream recordings over HTSP");
+      ShowToast("This server is too old to stream recordings over HTSP", icon::kWarning);
       return;
     }
 

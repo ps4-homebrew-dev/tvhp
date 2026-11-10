@@ -16,9 +16,50 @@
 	height: 100%;
 }
 
-#servers {
+/* The app's name over the list. */
+#brand {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
 	width: 900px;
-	height: 720px;
+	margin-bottom: 40px;
+}
+
+.brand-icon {
+	box-sizing: border-box;
+	width: 84px;
+	height: 84px;
+	margin-right: 26px;
+	padding-top: 14px;
+	font-size: 48px;
+	text-align: center;
+	color: #241604;
+	decorator: linear-gradient(135deg, #f7c26c 0%, #e9a13c 100%);
+	border-radius: 22px;
+	box-shadow: #f5b45340 0px 10px 30px 0px;
+}
+
+.brand-name {
+	font-size: 56px;
+	font-weight: bold;
+	color: #ffffff;
+}
+
+.brand-tag {
+	margin-left: 24px;
+	padding-top: 14px;
+	font-size: 24px;
+	color: #8593ab;
+}
+
+#servers {
+	box-sizing: border-box;
+	width: 900px;
+	height: 620px;
+	padding: 24px 24px 18px 24px;
+	background-color: #ffffff06;
+	border: 1px #ffffff10;
+	border-radius: 24px;
 }
 
 .server-row {
@@ -29,14 +70,27 @@
 	height: 96px;
 	margin-bottom: 12px;
 	margin-right: 12px;
-	padding: 0px 24px;
-	background-color: #ffffff06;
-	border-left: 6px #ffffff00;
+	padding: 0px 26px 0px 16px;
+	background-color: #ffffff07;
+	border-radius: 16px;
 	cursor: pointer;
 }
 
 .server-row:hover {
-	background-color: #ffffff0c;
+	background-color: #ffffff0e;
+}
+
+.srvicon {
+	box-sizing: border-box;
+	width: 64px;
+	height: 64px;
+	margin-right: 22px;
+	padding-top: 14px;
+	font-size: 32px;
+	text-align: center;
+	color: #f5b453;
+	background-color: #f5b4531a;
+	border-radius: 14px;
 }
 
 .srvinfo {
@@ -52,6 +106,7 @@
 	color: #e8edf7;
 	white-space: nowrap;
 	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .srvdetail {
@@ -61,36 +116,43 @@
 	color: #8593ab;
 	white-space: nowrap;
 	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
+/* The way in, on the selected row. */
+.srvgo {
+	font-size: 34px;
+	color: #241604;
+	visibility: hidden;
+}
 
 .server-row.selected {
-	background-color: #1a2336;
-	border-left: 6px #ffffff34;
+	background-color: #ffffff17;
 }
 
 #servers.active .server-row.selected {
-	background-color: #232f47;
-	border-left: 6px #f5b453;
+	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
+	box-shadow: #f5b45338 0px 6px 24px 0px;
 }
-
 #servers.active .server-row.selected .srvname {
-	color: #ffffff;
+	color: #241604;
 }
-
-/* Shown in place of the rows when nothing has been added yet. */
-.empty {
-	display: block;
-	padding: 40px 24px;
-	font-size: 26px;
-	color: #8593ab;
-	text-align: center;
+#servers.active .server-row.selected .srvdetail {
+	color: #5a3c0e;
+}
+#servers.active .server-row.selected .srvicon {
+	color: #241604;
+	background-color: #00000024;
+}
+#servers.active .server-row.selected .srvgo {
+	visibility: visible;
 }
 
 /* ------------------------------------------------------------------ */
-/* Add / edit server dialog (Options button)                           */
+/* Add / edit server dialog (Options button)                          */
 /* ------------------------------------------------------------------ */
 
+/* Over the list, which shows through blurred. */
 #server-dialog {
 	position: absolute;
 	top: 0px;
@@ -101,52 +163,57 @@
 	flex-direction: row;
 	align-items: center;
 	justify-content: center;
-	background-color: #060a14d9;
-	z-index: 20;
+	background-color: #060a14b0;
+	backdrop-filter: blur(14px);
+	z-index: 15;
+	animation: 0.2s cubic-out fade-in;
 }
 
 .dialog-card {
 	box-sizing: border-box;
-	width: 720px;
-	padding: 44px 52px;
-	background-color: #141b2b;
-	border: 2px #ffffff1f;
+	width: 760px;
+	padding: 44px 52px 40px 52px;
+	background-color: #141c2ef5;
+	border: 1px #ffffff1c;
+	border-radius: 26px;
+	box-shadow: #000000a0 0px 24px 70px 0px;
+	animation: 0.2s cubic-out dialog-in;
 }
 
 .dialog-title {
 	display: block;
-	margin-bottom: 30px;
+	margin-bottom: 32px;
 	font-size: 40px;
 	font-weight: bold;
 	color: #ffffff;
 }
 
-
 .field {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
-	margin-bottom: 24px;
+	margin-bottom: 20px;
 }
 
 .field .label {
 	box-sizing: border-box;
 	display: block;
-	width: 200px;
-	margin-right: 20px;
-	padding: 8px 12px;
-	font-size: 19px;
+	width: 210px;
+	margin-right: 18px;
+	padding: 10px 14px;
+	font-size: 18px;
 	font-weight: bold;
 	letter-spacing: 3px;
 	color: #8593ab;
 	border: 2px #ffffff00;
+	border-radius: 10px;
 	tab-index: auto;
 }
 
 .field .label:focus {
 	color: #f5b453;
 	border: 2px #f5b453;
-	background-color: #ffffff0a;
+	background-color: #f5b45314;
 }
 
 input.text, input.password {
@@ -157,15 +224,22 @@ input.text, input.password {
 	padding: 16px 20px;
 	font-size: 28px;
 	color: #e8edf7;
-	background-color: #ffffff0a;
+	background-color: #0b1020;
 	border: 2px #ffffff1c;
+	border-radius: 12px;
 	tab-index: auto;
 	caret-color: #f5b453;
 }
 
 input.text:focus, input.password:focus {
 	border: 2px #f5b453;
-	background-color: #ffffff12;
+	background-color: #0b1020;
+	box-shadow: #f5b45330 0px 0px 0px 4px;
+}
+
+input.text selection, input.password selection {
+	color: #241604;
+	background-color: #f5b453;
 }
 
 button {
@@ -176,23 +250,24 @@ button {
 	padding: 18px 0px;
 	font-size: 28px;
 	font-weight: bold;
-	letter-spacing: 2px;
+	letter-spacing: 1px;
 	text-align: center;
-	color: #171006;
-	background-color: #d99a3f;
-	border: 2px #d99a3f;
+	color: #e8edf7;
+	background-color: #ffffff12;
+	border-radius: 14px;
 	tab-index: auto;
 	cursor: pointer;
 }
 
 button:focus, button:hover {
-	background-color: #f5b453;
-	border: 2px #ffd28a;
+	color: #241604;
+	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
+	box-shadow: #f5b45340 0px 6px 22px 0px;
 }
 
 .dialog-buttons {
 	display: block;
-	margin-top: 12px;
+	margin-top: 18px;
 }
 
 .dialog-buttons button {
@@ -220,6 +295,7 @@ button span {
 
 .connect-hints {
 	display: flex;
+	flex-direction: row;
 	align-items: center;
-	margin-top: 36px;
+	margin-top: 32px;
 }

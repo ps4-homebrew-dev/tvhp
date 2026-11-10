@@ -13,6 +13,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "icons.h"
 #include "keymap.h"
 #include "format.h"
 
@@ -108,7 +109,7 @@ void App::PlayChannel(uint32_t channel_id)
   std::string error;
   if (!player_->PlayChannel(client_, channel_id, error))
     {
-      ShowToast(error.empty() ? "Unable to start playback" : error);
+      ShowToast(error.empty() ? "Unable to start playback" : error, icon::kWarning);
       return;
     }
   playing_channel_id_ = channel_id;
@@ -134,7 +135,7 @@ void App::StartRecording(uint32_t dvr_id, int64_t start_seconds)
   std::string error;
   if (!player_->PlayRecording(client_, dvr_id, start_seconds, error))
     {
-      ShowToast(error.empty() ? "Unable to play this recording" : error);
+      ShowToast(error.empty() ? "Unable to play this recording" : error, icon::kWarning);
       return;
     }
   playing_dvr_id_ = dvr_id;
@@ -150,7 +151,7 @@ void App::StartRecording(uint32_t dvr_id, int64_t start_seconds)
     }
   EnterWatch();
   if (start_seconds > 0)
-    ShowToast("Resumed at " + FmtPosition(start_seconds * 1000000));
+    ShowToast("Resumed at " + FmtPosition(start_seconds * 1000000), icon::kResume);
 }
 
 void App::StopPlayback()
@@ -220,6 +221,13 @@ void App::EnterWatch()
       bind_watching_ = true;
       model_.DirtyVariable("watching");
     }
+  // Whatever is chosen starts full screen, from the menus too.
+  if (!bind_fullscreen_)
+    {
+      bind_fullscreen_ = true;
+      model_.DirtyVariable("fullscreen");
+    }
+  MarkPlayingRows();
   const bool recorded = player_ && player_->IsRecordingPlayback();
   if (bind_watch_recorded_ != recorded)
     {
@@ -241,18 +249,102 @@ void App::EnterWatch()
 
 void App::ExitWatch()
 {
-  if (bind_menu_open_)
+  // The playback menu goes with the player; the resume question over the
+  // menus stays.
+  if (bind_menu_open_ && !bind_menu_dialog_)
     CloseMenu();
   if (bind_watching_)
     {
       bind_watching_ = false;
       model_.DirtyVariable("watching");
     }
+  if (bind_fullscreen_)
+    {
+      bind_fullscreen_ = false;
+      model_.DirtyVariable("fullscreen");
+    }
   if (bind_info_visible_)
     {
       bind_info_visible_ = false;
       model_.DirtyVariable("info_visible");
     }
+  MarkPlayingRows();
+}
+
+void App::SetFullscreen(bool on)
+{
+  if (!bind_watching_ || bind_fullscreen_ == on)
+    return;
+  if (bind_menu_open_)
+    CloseMenu(); // the playback menu, over either
+  bind_fullscreen_ = on;
+  model_.DirtyVariable("fullscreen");
+  if (on)
+    {
+      ShowWatchInfo(kWatchInfoSec);
+      return;
+    }
+
+  // Back to the menus, playing on: the info bar and a seek run go, and
+  // the list comes back at what plays.
+  if (bind_info_visible_)
+    {
+      bind_info_visible_ = false;
+      model_.DirtyVariable("info_visible");
+    }
+  seek_bubble_until_ = 0.0;
+  if (player_->IsRecordingPlayback())
+    {
+      SetSection(Section::Recordings);
+      for (size_t i = 0; i < recordings_.size(); i++)
+	if (recordings_[i].id == playing_dvr_id_)
+	  {
+	    sel_rec_ = (int)i;
+	    selected_dvr_id_ = playing_dvr_id_;
+	    model_.DirtyVariable("sel_rec");
+	    RebuildRecordingDetail();
+	  }
+      scroll_rec_pending_ = true;
+    }
+  else
+    {
+      SetSection(Section::Channels);
+      SetZone(Zone::Channels);
+      for (size_t i = 0; i < channels_.size(); i++)
+	if (channels_[i].id == playing_channel_id_ && sel_channel_ != (int)i)
+	  {
+	    sel_channel_ = (int)i;
+	    sel_epg_ = 0;
+	    model_.DirtyVariable("sel_channel");
+	    RebuildEpgRows();
+	    RebuildDetail();
+	  }
+      scroll_channels_pending_ = true;
+    }
+  MarkPlayingRows();
+  UpdateWatchOverlay();
+}
+
+void App::MarkPlayingRows()
+{
+  bool changed = false;
+  for (size_t i = 0; i < channel_rows_.size() && i < channels_.size(); i++)
+    {
+      const bool playing = bind_watching_ && channels_[i].id == playing_channel_id_;
+      changed |= channel_rows_[i].playing != playing;
+      channel_rows_[i].playing = playing;
+    }
+  if (changed)
+    model_.DirtyVariable("channels");
+  changed = false;
+  for (size_t i = 0; i < rec_rows_.size() && i < recordings_.size(); i++)
+    {
+      const bool playing = bind_watching_ && recordings_[i].id == playing_dvr_id_;
+      changed |= rec_rows_[i].playing != playing;
+      rec_rows_[i].playing = playing;
+    }
+  if (changed)
+    model_.DirtyVariable("recordings");
 }
 
 void App::ShowWatchInfo(double seconds)
@@ -295,19 +387,20 @@ void App::UpdateWatchOverlay()
       const int64_t dur = player_->DurationUs();
       now_time = FmtPosition(pos) + (dur > 0 ? " / " + FmtPosition(dur) : "");
       progress = Percent(pos, dur);
-      num = player_->IsPaused() ? "II" : "";
+      // The OSD shows playing or paused in place of a channel number.
       if (player_->DurationReliable())
 	ends = EndsAt(pos, dur, player_->Speed());
 
       // The seek bubble rides on the bar where the playhead is.
       if (Now() <= seek_bubble_until_ && dur > 0)
 	{
-	  // Half the bubble's width (120px) as a share of the 1808px bar.
-	  const double half = 120.0 * 100.0 / 1808.0;
+	  // The bubble is centred on the playhead (240px wide, see watch.rcss),
+	  // kept half its width from either end of the 1920px timeline.
+	  const double half = 120.0 * 100.0 / 1920.0;
 	  const double at = std::clamp((double)std::max<int64_t>(pos, 0) * 100.0 / (double)dur,
 				       half, 100.0 - half);
 	  char buf[16];
-	  std::snprintf(buf, sizeof(buf), "%.2f%%", at - half);
+	  std::snprintf(buf, sizeof(buf), "%.2f%%", at);
 	  if (bind_watch_seek_at_ != buf)
 	    {
 	      bind_watch_seek_at_ = buf;
@@ -394,7 +487,7 @@ void App::SeekStep(int sign, bool large)
 {
   if (!player_->CanSeek())
     {
-      ShowToast("This recording can't be seeked");
+      ShowToast("This recording can't be seeked", icon::kWarning);
       return;
     }
   // A run of presses (or a held button) in one direction speeds up: 10 s
@@ -474,13 +567,13 @@ void App::CycleAudioTrack(int direction)
   if (tracks.size() < 2)
     {
       if (!tracks.empty())
-	ShowToast("Only one audio track");
+	ShowToast("Only one audio track", icon::kAudio);
       return;
     }
   const size_t next = NextTrack(tracks, player_->CurrentAudioStream(), direction);
   PickAudioTrack(tracks[next]);
   ShowToast("Audio " + std::to_string(next + 1) + "/" + std::to_string(tracks.size()) +
-	    ": " + tracks[next].label);
+	    ": " + tracks[next].label, icon::kAudio);
 }
 
 // Subtitles cycle through "off" and every track.
@@ -543,7 +636,7 @@ void App::UpdateSleepTimer()
   if (bind_watching_)
     {
       StopPlayback();
-      ShowToast("Sleep timer: playback stopped");
+      ShowToast("Sleep timer: playback stopped", icon::kSleep);
     }
 }
 
@@ -558,6 +651,10 @@ void App::OpenWatchMenu()
   bind_menu_title_ = recorded ? "Playback" : "Live TV";
   bind_menu_meta_.clear();
   bind_menu_dialog_ = false;
+
+  // Behind the menus: the way back to the picture, first.
+  if (VideoBehind())
+    menu_items_.push_back({"Full screen", nullptr, [this](int) { SetFullscreen(true); }});
 
   if (player_->AudioTracks().size() > 1)
     {
@@ -768,7 +865,7 @@ void App::HandleKeyMenu(Rml::Event& event, int key)
     default:
       break;
     }
-  if (bind_watching_)
+  if (bind_watching_ && bind_fullscreen_)
     ShowWatchInfo(kWatchInfoSec);
 }
 
@@ -839,10 +936,15 @@ void App::HandleKeyWatch(Rml::Event& event, int key)
 	  else
 	    ShowWatchInfo(kWatchInfoSec);
 	  break;
-	case keymap::Cmd::Back:  // circle: back to the list
-	case keymap::Cmd::Stop:
+	// Circle and the remote's guide: the menus, playing on behind them
+	// (Kodi's way). Stop stops.
+	case keymap::Cmd::Back:
 	case keymap::Cmd::Guide:
+	  SetFullscreen(false);
+	  break;
+	case keymap::Cmd::Stop:
 	  StopPlayback();
+	  ShowToast("Playback stopped", icon::kStop);
 	  break;
 	default:
 	  return;
@@ -885,11 +987,17 @@ void App::HandleKeyWatch(Rml::Event& event, int key)
       else
 	ShowWatchInfo(kWatchInfoSec);
       break;
+    // Left, circle and the remote's guide: the channel list, the channel
+    // playing on behind it (Kodi's way). Cross on it there comes back; on
+    // another channel, tunes to that. Stop stops.
     case keymap::Cmd::Left:
-    case keymap::Cmd::Back: // back to the channel list, keep watching? No:
-    case keymap::Cmd::Stop: // Back means back. OK from the list resumes.
+    case keymap::Cmd::Back:
     case keymap::Cmd::Guide:
+      SetFullscreen(false);
+      break;
+    case keymap::Cmd::Stop:
       StopPlayback();
+      ShowToast("Playback stopped", icon::kStop);
       break;
     default:
       return;

@@ -33,6 +33,10 @@ add_executable(tvhp
 )
 
 target_compile_options(tvhp PRIVATE -Wall -Werror)
+# Antialiasing of the UI's edges (rounded corners, curves): the renderer's
+# default of 2 samples leaves them visibly stepped. Clamped to what the
+# driver supports (RmlUi_Renderer_GL3.cpp). As in jtplay.
+target_compile_definitions(tvhp PRIVATE RMLUI_NUM_MSAA_SAMPLES=4)
 
 add_library(hts STATIC
   libhts/htsmsg.c

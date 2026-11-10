@@ -3,10 +3,14 @@
  *
  * Row heights and margins here are mirrored by the pitch constants in
  * src/app_internal.h, which keyboard scrolling uses; change both together.
+ *
+ * Focus is jtplay's: in the pane that has it, the selected row is a solid
+ * accent bar with dark text. The other pane keeps its selection as a
+ * lighter row, so it is clear which channel the guide is for.
  */
 
 /* ------------------------------------------------------------------ */
-/* Channel rows (height + margin mirrored in app.cpp)                 */
+/* Channel rows (96 + 12, kChannelRowPitch)                           */
 /* ------------------------------------------------------------------ */
 
 .channel-row {
@@ -17,22 +21,30 @@
 	height: 96px;
 	margin-bottom: 12px;
 	margin-right: 12px;
-	padding: 0px 22px 0px 16px;
-	background-color: #ffffff06;
-	border-left: 6px #ffffff00;
+	padding: 0px 24px 0px 14px;
+	background-color: #ffffff07;
+	border-radius: 14px;
 	cursor: pointer;
 }
 
 .channel-row:hover {
-	background-color: #ffffff0c;
+	background-color: #ffffff0e;
 }
 
+/* The channel number on a tile of its own. */
 .chnum {
+	box-sizing: border-box;
 	display: block;
-	width: 92px;
-	font-size: 40px;
+	width: 84px;
+	height: 64px;
+	margin-right: 22px;
+	padding-top: 10px;
+	font-size: 34px;
 	font-weight: bold;
-	color: #5a6478;
+	text-align: center;
+	color: #8593ab;
+	background-color: #ffffff0b;
+	border-radius: 12px;
 }
 
 .chinfo {
@@ -49,6 +61,15 @@
 	color: #e8edf7;
 	white-space: nowrap;
 	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* On screen now (behind the menus). */
+.chlive {
+	margin-left: 14px;
+	font-size: 26px;
+	font-weight: normal;
+	color: #ff6b6b;
 }
 
 .chnow {
@@ -58,6 +79,7 @@
 	color: #8593ab;
 	white-space: nowrap;
 	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .progress {
@@ -65,13 +87,15 @@
 	width: 100%;
 	height: 6px;
 	margin-top: 10px;
-	background-color: #ffffff10;
+	background-color: #ffffff12;
+	border-radius: 3px;
 }
 
 .progress .bar {
 	display: block;
 	height: 6px;
-	background-color: #f5b453;
+	decorator: linear-gradient(90deg, #e9a13c 0%, #f7c26c 100%);
+	border-radius: 3px;
 }
 
 .chtime {
@@ -79,33 +103,50 @@
 	width: 170px;
 	font-size: 21px;
 	text-align: right;
-	color: #5a6478;
+	color: #6f7b92;
 	white-space: nowrap;
 }
 
-/* Selection: strong amber treatment while the channel pane has focus,
- * dimmed to a neutral marker while browsing the guide. */
+/* Selected while the guide has focus: a lighter row, its number lit. */
 .channel-row.selected {
-	background-color: #1a2336;
-	border-left: 6px #ffffff34;
+	background-color: #ffffff17;
 }
-
-#channels.active .channel-row.selected {
-	background-color: #232f47;
-	border-left: 6px #f5b453;
-}
-
-#channels.active .channel-row.selected .chnum {
+.channel-row.selected .chnum {
 	color: #f5b453;
+	background-color: #f5b45320;
 }
-
 .channel-row.selected .chnow,
 .channel-row.selected .chtime {
 	color: #aab6cc;
 }
 
+/* Selected in the focused channel list: the accent bar. */
+#channels.active .channel-row.selected {
+	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
+	box-shadow: #f5b45338 0px 6px 24px 0px;
+}
+#channels.active .channel-row.selected .chnum {
+	color: #241604;
+	background-color: #00000024;
+}
+#channels.active .channel-row.selected .chname,
+#channels.active .channel-row.selected .chlive {
+	color: #241604;
+}
+#channels.active .channel-row.selected .chnow,
+#channels.active .channel-row.selected .chtime {
+	color: #5a3c0e;
+}
+#channels.active .channel-row.selected .progress {
+	background-color: #00000026;
+}
+#channels.active .channel-row.selected .progress .bar {
+	decorator: none;
+	background-color: #241604c0;
+}
+
 /* ------------------------------------------------------------------ */
-/* EPG rows (height + margin mirrored in app.cpp)                     */
+/* EPG rows (76 + 10, kEpgRowPitch)                                   */
 /* ------------------------------------------------------------------ */
 
 .epg-row {
@@ -116,14 +157,14 @@
 	height: 76px;
 	margin-bottom: 10px;
 	margin-right: 12px;
-	padding: 0px 20px 0px 16px;
-	background-color: #ffffff05;
-	border-left: 6px #ffffff00;
+	padding: 0px 22px 0px 22px;
+	background-color: #ffffff06;
+	border-radius: 12px;
 	cursor: pointer;
 }
 
 .epg-row:hover {
-	background-color: #ffffff0b;
+	background-color: #ffffff0d;
 }
 
 .evtime {
@@ -141,58 +182,82 @@
 	color: #c4cddd;
 	white-space: nowrap;
 	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
+/* What is on now: brighter, with the red NOW pill. */
+.epg-row.now {
+	background-color: #ffffff0c;
+}
+.epg-row.now .evtime,
+.epg-row.now .evtitle {
+	color: #ffffff;
+	font-weight: bold;
+}
+
+/* Day changes, and NOW. */
 .evday {
 	box-sizing: border-box;
 	display: inline-block;
 	margin-left: 16px;
 	padding: 5px 13px;
-	font-size: 18px;
+	font-size: 17px;
 	font-weight: bold;
 	letter-spacing: 2px;
 	color: #8593ab;
-	background-color: #ffffff0d;
+	background-color: #ffffff0f;
+	border-radius: 8px;
 	white-space: nowrap;
 }
 
-.epg-row.now .evtime {
-	color: #e8edf7;
-	font-weight: bold;
-}
-
-.epg-row.now .evtitle {
-	color: #e8edf7;
-	font-weight: bold;
-}
-
-.epg-row.selected {
-	background-color: #232f47;
-	border-left: 6px #f5b453;
-}
-
-.epg-row.selected .evtitle {
+.evday.now {
 	color: #ffffff;
+	background-color: #e04848;
 }
 
-/* Scheduled / in-progress recording marker in the guide. */
+/* Recording markers: REC on air (red), scheduled (the calendar). */
 .evbadge {
 	box-sizing: border-box;
 	display: inline-block;
-	margin-left: 12px;
+	margin-left: 14px;
+	white-space: nowrap;
+}
+
+.evbadge.live {
 	padding: 5px 12px;
 	font-size: 17px;
 	font-weight: bold;
 	letter-spacing: 2px;
-	white-space: nowrap;
+	color: #ffffff;
+	background-color: #e04848;
+	border-radius: 8px;
 }
 
-.evbadge.rec {
+.evbadge.sched {
+	font-size: 26px;
 	color: #ff8f8f;
-	background-color: #ff5c5c1f;
-	border: 1px #ff5c5c4d;
 }
 
 .epg-row.rec .evtitle {
 	color: #e8edf7;
+}
+
+/* Selected in the focused guide: the accent bar, dark text. */
+.epg-row.selected {
+	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
+	box-shadow: #f5b45338 0px 6px 24px 0px;
+}
+.epg-row.selected .evtitle {
+	color: #241604;
+	font-weight: bold;
+}
+.epg-row.selected .evtime {
+	color: #5a3c0e;
+}
+.epg-row.selected .evday {
+	color: #241604;
+	background-color: #00000024;
+}
+.epg-row.selected .evbadge.sched {
+	color: #8a1d1d;
 }

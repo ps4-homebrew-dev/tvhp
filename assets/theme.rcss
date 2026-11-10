@@ -2,13 +2,19 @@
  * Designed for a 1920x1080 context viewed from the couch: large type, high
  * contrast, generous spacing, and an unmissable focus treatment. Palette is
  * a deep blue-slate night background with a warm "tuner amber" accent used
- * exclusively for focus/selection, plus a red reserved for on-air markers.
+ * for focus and selection, plus a red reserved for what is on air.
  *
- *   background   #0a0e18 / #111a2b
- *   panel        #ffffff07 .. #ffffff14
+ *   background   #0b1020, lit from the top left
+ *   panel        #ffffff08 .. #ffffff14, rounded
  *   text         #e8edf7    muted #8593ab    faint #5a6478
- *   accent       #f5b453 (focus / selection only)
- *   live         #ff5c5c (on-air only)
+ *   accent       #f5b453, as a bar #f7c26c -> #e9a13c with dark text #241604
+ *   live         #ff5c5c (on air, recording now)
+ *
+ * The look follows jtplay's: rounded rows, focus as a solid accent bar with
+ * dark text (as in Kodi), soft shadows, glass over the picture. It needs the
+ * GPU (gradients, blur and shadows are shaders), which the console has since
+ * Mesa came over Vulkan; the software renderer it was once drawn with could
+ * do flat colour only.
  *
  * The per-view rules live in assets/css/; this file holds the palette note
  * and the global body scaffold that all of them build on.
@@ -19,7 +25,7 @@ body {
 	height: 100%;
 	font-size: 26px;
 	color: #e8edf7;
-	/* Flat color: gradient decorators need shader support, which the SDL
-	   software renderer does not provide. */
-	background-color: #0e1424;
+	background-color: #0b1020;
+	decorator: radial-gradient(circle farthest-corner at 12% 0%, #1c2742 0%, #0b1020 55%);
+	transition: background-color 0.25s cubic-out;
 }

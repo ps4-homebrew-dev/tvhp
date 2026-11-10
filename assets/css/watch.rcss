@@ -1,175 +1,281 @@
 /*
- * Watch mode: hides the UI chrome so the video shows through, and styles
- * the auto-hiding info bar over it.
+ * Watch mode: the video is drawn beneath the RmlUi layer. Full screen, the
+ * menus hide so it shows through, with jtplay's OSD along the bottom; back
+ * from full screen, it plays on behind the menus under a shade.
  */
 
 /* ------------------------------------------------------------------ */
-/* Watch mode (full-screen video)                                     */
+/* Full screen and behind the menus                                   */
 /* ------------------------------------------------------------------ */
 
 /* Let the video drawn beneath the UI show through. */
 body.watching {
-	background-color: transparent;
+	background-color: #0b102000;
 	decorator: none;
 }
-body.watching #topbar,
-body.watching #content,
-body.watching #footer {
+body.watching #main-view {
 	display: none;
 }
 
-/* Over the picture, notices go to the top, clear of the info bar and the
- * seek bubble. */
+/* A video playing on behind the menus (back from full screen): the menus'
+ * background gives way to the picture, under a shade dark enough for the
+ * lists, lighter at the top right where the clock is, so the picture shows
+ * as more than a tint. */
+body.behind {
+	background-color: #0b102000;
+	decorator: none;
+}
+
+#video-shade {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	right: 0px;
+	bottom: 0px;
+	decorator: linear-gradient(90deg, #0b1020f0 0%, #0b1020e0 55%, #0b1020c8 100%),
+	           linear-gradient(180deg, #0b102000 70%, #0b1020c0 100%);
+	animation: 0.25s cubic-out fade-in;
+}
+
+/* Coming back to the menus: they fade in over the picture. */
+body.behind #main-view {
+	animation: 0.25s cubic-out fade-in;
+}
+
+/* Over the picture, notices go to the top, clear of the OSD. */
 body.watching #toast {
-	top: 60px;
-	bottom: auto;
+	top: 56px;
 }
 
-#watch-bar {
+/* ------------------------------------------------------------------ */
+/* OSD bar                                                            */
+/* ------------------------------------------------------------------ */
+
+#osd {
+	z-index: 5;
 	position: absolute;
-	left: 0;
-	right: 0;
-	bottom: 0;
-	display: flex;
-	flex-direction: column;
-	padding: 36px 56px 44px 56px;
-	background-color: #0a0e18d8;
-	border-top: 2px #ffffff14;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
+	box-sizing: border-box;
+	padding: 40px 72px 44px 72px;
+	decorator: linear-gradient(180deg, #0a0e18e0 0%, #0a0e18f5 100%);
+	animation: 0.2s cubic-out osd-in;
 }
 
-/* The channel number, title block and clock share one row; the progress
- * bar is a sibling below them so it can span the bar's full width. */
-.watch-row {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
+@keyframes osd-in {
+	from { transform: translateY(40px); opacity: 0; }
+	to   { transform: translateY(0px); opacity: 1; }
 }
 
-.watch-num {
-	font-size: 84px;
-	font-weight: bold;
-	color: #f5b453;
-	margin-right: 40px;
-}
-
-/* Playing a recording: the channel-number slot becomes a play/pause glyph. */
-.watch-num.transport {
-	font-size: 60px;
-	width: 96px;
-	text-align: center;
-	color: #e8edf7;
-}
-
-.watch-main {
-	display: flex;
-	flex-direction: column;
-	flex: 1;
-	margin-right: 40px;
-}
-
-.watch-name {
-	font-size: 40px;
-	font-weight: bold;
-	color: #e8edf7;
-}
-
-.watch-now {
-	margin-top: 6px;
-	font-size: 30px;
-	color: #8593ab;
-}
-
-.watch-progress {
-	display: block;
-	position: relative;
-	margin-top: 24px;
-	width: 100%;
-	height: 8px;
-	background-color: #ffffff1a;
-}
-.watch-progress .bar {
-	display: block;
-	height: 8px;
-	background-color: #f5b453;
-}
-
-.watch-side {
-	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-}
-
-.watch-time {
-	font-size: 30px;
-	color: #e8edf7;
-}
-
-.watch-status {
-	margin-top: 6px;
-	font-size: 22px;
-	letter-spacing: 2px;
-	color: #8593ab;
-}
-
-.watch-ends {
-	margin-top: 6px;
-	font-size: 22px;
-	color: #8593ab;
-}
-
-/* Seeking: how far the presses so far have jumped, riding on the bar. The
- * app positions its left edge (240px wide; see UpdateWatchOverlay). */
-.watch-seek {
+/* The timeline, along the top edge: the programme on air for live TV, the
+ * position in a recording. */
+.osd-edge {
 	position: absolute;
-	bottom: 20px;
+	left: 0px;
+	right: 0px;
+	top: 0px;
+	height: 8px;
+	background-color: #ffffff2e;
+}
+
+.osd-played {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	height: 8px;
+	decorator: linear-gradient(90deg, #e09a37 0%, #f5b453 100%);
+	box-shadow: #f5b45380 0px 0px 14px 0px;
+}
+
+.osd-knob {
+	position: absolute;
+	top: -8px;
+	width: 24px;
+	height: 24px;
+	margin-left: -12px;
+	box-sizing: border-box;
+	background-color: #ffffff;
+	border: 5px #f5b453;
+	border-radius: 12px;
+}
+
+/* How far a run of seeks has jumped, over the playhead. 240px wide: the
+ * app keeps its middle 120px from either end (UpdateWatchOverlay). */
+.osd-seek {
+	position: absolute;
+	bottom: 26px;
 	box-sizing: border-box;
 	width: 240px;
+	margin-left: -120px;
 	padding: 8px 0px;
 	font-size: 28px;
 	font-weight: bold;
 	text-align: center;
-	color: #10131c;
-	background-color: #f5b453;
+	color: #241604;
+	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
+	border-radius: 12px;
+	box-shadow: #00000080 0px 8px 24px 0px;
 }
 
-/* The tracks being decoded and the settings that are on, as chips, with
- * the hint for the playback menu at the far end. */
-.watch-tracks {
+.osd-row {
 	display: flex;
 	flex-direction: row;
 	align-items: center;
-	margin-top: 20px;
 }
 
-.watch-track {
-	margin-right: 14px;
-	padding: 6px 14px;
-	font-size: 20px;
-	color: #a9b4c8;
-	background-color: #ffffff10;
+/* Live TV: the channel number; a recording: playing or paused. */
+.osd-num,
+.osd-glyph {
+	box-sizing: border-box;
+	flex-shrink: 0;
+	width: 120px;
+	height: 100px;
+	margin-right: 36px;
+	padding-top: 12px;
+	font-size: 60px;
+	font-weight: bold;
+	text-align: center;
+	color: #f5b453;
+	background-color: #f5b4531a;
+	border-radius: 20px;
+}
+
+.osd-glyph {
+	padding-top: 18px;
+	font-size: 54px;
+	font-weight: normal;
+	color: #ffffff;
+	background-color: #ffffff12;
+}
+
+.osd-main {
+	display: flex;
+	flex-direction: column;
+	flex: 1;
+	overflow: hidden;
+}
+
+.osd-title {
+	font-size: 42px;
+	font-weight: bold;
+	color: #ffffff;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.osd-desc {
+	margin-top: 4px;
+	font-size: 26px;
+	color: #aab6cc;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.osd-tracks {
+	display: flex;
+	flex-direction: row;
+	margin-top: 14px;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+.osd-track {
+	margin-right: 12px;
+	padding: 4px 14px;
+	font-size: 19px;
+	color: #aab6cc;
+	background-color: #ffffff12;
+	border-radius: 8px;
 	white-space: nowrap;
 }
 
-.watch-track.badge {
-	color: #10131c;
+.osd-track.badge {
+	color: #241604;
 	background-color: #f5b453;
 	font-weight: bold;
 }
 
-.watch-tracks .spacer {
-	flex: 1;
+.osd-side {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	flex-shrink: 0;
+	margin-left: 48px;
 }
 
-.watch-tracks .hint {
+/* "22:04 / 45:00", or the programme's "20:00 - 21:30" after LIVE. */
+.osd-time {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	font-size: 36px;
+	font-weight: bold;
+	color: #ffffff;
+	white-space: nowrap;
+}
+
+.osd-live {
+	margin-right: 18px;
+	padding: 4px 9px 4px 12px; /* the letter spacing pads the right already */
+	font-size: 19px;
+	font-weight: bold;
+	letter-spacing: 3px;
+	color: #ffffff;
+	background-color: #e04848;
+	border-radius: 7px;
+}
+
+/* "Ends at 21:40", under the time. */
+.osd-ends {
+	margin-top: 6px;
+	font-size: 22px;
+	color: #aab6cc;
+	white-space: nowrap;
+}
+
+.osd-status {
+	margin-top: 6px;
+	font-size: 21px;
+	color: #ff8f8f;
+	white-space: nowrap;
+}
+
+.osd-hint {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	margin-top: 14px;
+}
+
+.osd-hint .hint {
 	margin-right: 0px;
 }
 
-/* A button without icon art: its name on a keycap. */
-.keycap {
-	padding: 4px 10px;
-	font-size: 16px;
-	font-weight: bold;
-	letter-spacing: 2px;
-	color: #c5cee0;
-	border: 2px #8593ab;
+/* ------------------------------------------------------------------ */
+/* Paused: a large badge in the middle, Kodi style                    */
+/* ------------------------------------------------------------------ */
+
+#pause-badge {
+	z-index: 4;
+	position: absolute;
+	left: 50%;
+	top: 40%;
+	box-sizing: border-box;
+	width: 180px;
+	height: 180px;
+	margin-left: -90px;
+	margin-top: -90px;
+	padding-top: 42px;
+	font-size: 90px;
+	text-align: center;
+	color: #ffffff;
+	background-color: #0a0e1880;
+	backdrop-filter: blur(16px);
+	border: 1px #ffffff26;
+	border-radius: 90px;
+	box-shadow: #00000080 0px 16px 50px 0px;
+	animation: 0.2s cubic-out dialog-in;
 }

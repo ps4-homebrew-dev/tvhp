@@ -1,15 +1,16 @@
 /*
  * Playback menu: a side blade over the left edge, opened with the Options
- * button while watching; or (#menu.dialog) a small dialog in the middle of
- * the screen for a question that needs an answer first (resume?). Left /
- * right change a setting in place, cross runs an action, circle closes.
+ * button while watching (or over a video playing behind the menus); or
+ * (#menu.dialog) a small dialog in the middle of the screen for a question
+ * that needs an answer first (resume?). Left / right change a setting in
+ * place, cross runs an action, circle closes.
  *
- * Taken from jtplay, in tvhp's colours. Row height and margin are mirrored
- * by kMenuRowPitch in src/app_internal.h.
+ * jtplay's, in tvhp's colours. Row height and margin are mirrored by
+ * kMenuRowPitch in src/app_internal.h.
  */
 
-/* Over the video the blade only needs a light shade; over the lists the
- * dialog darkens them so the question stands out. */
+/* Stacking, bottom to top: video shade 0, menus 1, pause badge 4, OSD 5,
+ * menu 10, server dialog 15, toast 20. */
 #menu-scrim {
 	z-index: 9;
 	position: absolute;
@@ -18,9 +19,11 @@
 	right: 0px;
 	bottom: 0px;
 	background-color: #05080f60;
+	animation: 0.18s cubic-out fade-in;
 }
 #menu-scrim.dialog {
-	background-color: #05080fb8;
+	background-color: #05080fa0;
+	backdrop-filter: blur(10px);
 }
 
 #menu {
@@ -30,12 +33,12 @@
 	top: 0px;
 	bottom: 0px;
 	box-sizing: border-box;
-	width: 640px;
+	width: 660px;
 	padding: 72px 40px;
 	display: flex;
 	flex-direction: column;
 	decorator: linear-gradient(90deg, #141c2e 0%, #10172a 100%);
-	border-right: 2px #ffffff14;
+	border-right: 1px #ffffff14;
 	box-shadow: #000000a0 20px 0px 60px 0px;
 	animation: 0.18s cubic-out blade-in;
 }
@@ -49,8 +52,7 @@
 	margin: 0px 0px 36px 24px;
 	font-size: 30px;
 	font-weight: bold;
-	letter-spacing: 1px;
-	color: #e8edf7;
+	color: #ffffff;
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -73,7 +75,7 @@
 	height: 72px;
 	margin-bottom: 6px;
 	padding: 0px 24px;
-	border-left: 6px #ffffff00;
+	border-radius: 12px;
 }
 
 .menu-label {
@@ -87,7 +89,7 @@
 
 /* The value is what changes with left / right: keep it visible. */
 .menu-value {
-	max-width: 330px;
+	max-width: 340px;
 	font-size: 24px;
 	color: #8593ab;
 	white-space: nowrap;
@@ -95,18 +97,19 @@
 	text-overflow: ellipsis;
 }
 
-/* The selection in tvhp's way: a lighter row with the amber edge. */
 .menu-row.selected {
-	background-color: #ffffff12;
-	border-left: 6px #f5b453;
+	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
+	box-shadow: #f5b45338 0px 6px 22px 0px;
 }
-.menu-row.selected .menu-label { color: #ffffff; font-weight: bold; }
-.menu-row.selected .menu-value { color: #f5b453; }
+.menu-row.selected .menu-label { color: #241604; font-weight: bold; }
+.menu-row.selected .menu-value { color: #5a3c0e; }
 
 /* ------------------------------------------------------------------ */
 /* Dialog                                                             */
 /* ------------------------------------------------------------------ */
 
+/* Glass over what it interrupts, one border all around. (A border on one
+ * side of a rounded box tapers along its corners into a ragged sliver.) */
 #menu.dialog {
 	left: 50%;
 	top: 50%;
@@ -117,8 +120,9 @@
 	padding: 40px 48px 32px 48px;
 	border-right-width: 0px;
 	border: 1px #ffffff1f;
+	border-radius: 26px;
 	decorator: none;
-	background-color: #10172af0;
+	background-color: #141c2ef0;
 	box-shadow: #000000a0 0px 24px 70px 0px;
 	animation: 0.2s cubic-out dialog-in;
 }
@@ -136,6 +140,7 @@
 
 #menu.dialog .menu-row {
 	justify-content: center;
+	border-radius: 14px;
 }
 
 #menu.dialog .menu-label {
@@ -155,6 +160,7 @@
 	height: 6px;
 	margin: 22px 0px 30px 0px;
 	background-color: #ffffff1f;
+	border-radius: 3px;
 }
 
 .dialog-played {
@@ -162,5 +168,6 @@
 	left: 0px;
 	top: 0px;
 	height: 6px;
-	background-color: #f5b453;
+	decorator: linear-gradient(90deg, #e09a37 0%, #f5b453 100%);
+	border-radius: 3px;
 }

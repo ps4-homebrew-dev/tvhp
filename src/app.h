@@ -68,6 +68,7 @@ private:
     Rml::String now_time;
     Rml::String progress_style; // "42%", bound via data-style-width
     bool has_now = false;
+    bool playing = false; // the channel that plays (behind the menus)
   };
   struct EpgRow {
     Rml::String time;  // "20:00 - 21:30"
@@ -86,6 +87,7 @@ private:
     bool failed = false;
     bool resumable = false; // left part-way: the progress bar shows
     bool watched = false;   // watched to the end at least once
+    bool playing = false;   // the recording that plays (behind the menus)
   };
   // A row of the playback menu, or of a question such as "resume?".
   struct MenuRow {
@@ -159,7 +161,18 @@ private:
   void ShowWatchInfo(double seconds);
   void UpdateWatchOverlay();
   void EnsureRowVisible(const char* list_id, int index, float row_pitch);
-  void ShowToast(const std::string& text);
+  // A notice for a few seconds, with an icon (src/icons.h) in front.
+  void ShowToast(const std::string& text, const char* icon = nullptr);
+
+  // --- Video behind the menus (from jtplay) --------------------------------
+  // Back from full screen leaves the video playing behind the guide or the
+  // recordings, under a shade, as in Kodi; selecting what plays (or the
+  // Options menu's "Full screen") goes back to it, and Back from the top of
+  // the menus stops it.
+  void SetFullscreen(bool on);
+  bool VideoBehind() const { return bind_watching_ && !bind_fullscreen_; }
+  // The list rows of what plays, marked as such.
+  void MarkPlayingRows();
 
   // --- Playback (from jtplay) ----------------------------------------------
   // Recordings: asks whether to resume when the server has a position for
@@ -204,6 +217,8 @@ private:
   Rml::String bind_status_;       // connect screen status line
   Rml::String bind_server_;       // topbar server info
   Rml::String bind_clock_;        // topbar clock
+  Rml::String bind_date_;         // topbar date, "Tuesday 10 November"
+  Rml::String bind_toast_icon_;
   Rml::String bind_toast_;
   Rml::String bind_epg_channel_;  // heading of the guide pane
   Rml::String bind_detail_title_;
@@ -211,7 +226,8 @@ private:
   Rml::String bind_detail_desc_;
   Rml::String bind_detail_rec_;   // "Recording scheduled" banner
   Rml::String bind_player_status_;
-  bool bind_watching_ = false;     // full-screen video, UI chrome hidden
+  bool bind_watching_ = false;     // something plays (full screen or behind)
+  bool bind_fullscreen_ = false;   // ... full screen, the menus hidden
   bool bind_info_visible_ = false; // watch info bar shown (auto-hides)
   Rml::String bind_watch_num_;
   Rml::String bind_watch_name_;

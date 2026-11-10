@@ -54,6 +54,7 @@ void App::RebuildChannelRows()
 	  row.now_title = "No programme information";
 	  row.progress_style = "0%";
 	}
+      row.playing = bind_watching_ && ch.id == playing_channel_id_;
       channel_rows_.push_back(std::move(row));
     }
 

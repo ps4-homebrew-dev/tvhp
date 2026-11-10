@@ -94,6 +94,9 @@ extern "C" int SDL_main(int argc, char* argv[]) {
   Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-BoldItalic.ttf", false);
   Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Italic.ttf", false);
   Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Regular.ttf", false);
+  // Fallbacks, for characters the text font lacks: the UI's icons (in the
+  // Private Use Area, see src/icons.h), then emoji in titles and names.
+  Rml::LoadFontFace(options.fonts_dir + "/lucide.ttf", true);
   Rml::LoadFontFace(options.fonts_dir + "/NotoEmoji-VariableFont_wght.ttf", true);
 
   if (!app.Initialize(ctx, options, err)) {

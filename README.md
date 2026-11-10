@@ -29,10 +29,16 @@ connection that carries the channel list and the guide.
   from channel to channel, as does turning them off.
 - Seek steps that grow while you keep pressing (10 s → 30 s → 1 min → 5 min),
   "ends at" for recordings, and the tracks being played on the info bar.
+- **Video behind the menus**, as in Kodi — Back from full screen brings the
+  guide or the recordings up over the picture, which plays on behind them,
+  with what plays in the top bar. Select it (or Options → Full screen) to go
+  back to it; Back from the top of the menus stops it.
 - **Multiple servers** — save as many as you like and switch between them
   without restarting.
 - Designed for a 1920x1080 screen at couch distance: large type, high
-  contrast, and a single unmistakable focus colour.
+  contrast, and a single unmistakable focus colour. The look is jtplay's —
+  rounded rows, an amber focus bar, soft shadows, glass dialogs, Lucide icons —
+  which takes the GPU (Mesa over Vulkan on the console).
 
 ## Controls
 
@@ -48,14 +54,15 @@ command is reachable from any of them; the pad mapping lives in
 | Page up / down | L1 / R1 | P+ / P- | Page Up / Page Down |
 | First / last row | L2 / R2 | — | Home / End |
 | Select, record, play/pause | Cross | Enter | Enter |
-| Back, cancel | Circle | Back | Escape, Backspace |
+| Back, cancel; from full screen: the menus, playing on | Circle | Back | Escape, Backspace |
+| Back to full screen | Cross on what plays, or Options → Full screen | Enter | Enter |
 | Guide ↔ recordings, info bar | Square | Display | Tab |
 | Delete recording or server | Triangle | Red | Delete |
 | Add a server; playback menu while watching | Options (or hold Cross) | Menu (or hold OK) | Insert (or hold Enter) |
 | Next audio track | — | Audio | F2 |
 | Jump to the guide | Back/select (not on a PS4) | Guide | F9 |
 | Play / pause | Cross | Play, Pause | Space |
-| Stop | Circle | Stop | — |
+| Stop | Circle from the top of the menus, or Options → Stop | Stop | — |
 | Seek ±10 s, growing while pressed | Left / Right | Rewind, Fast forward | Left / Right |
 | Seek ±5 min | Up / Down, L1 / R1 | Skip | Page Up / Page Down |
 

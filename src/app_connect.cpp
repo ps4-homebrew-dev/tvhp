@@ -7,6 +7,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "icons.h"
 #include "keymap.h"
 
 using namespace appdetail;
@@ -158,7 +159,7 @@ void App::DeleteSelectedServer() {
   if (confirm_server_index_ != sel_server_ || now >= confirm_deadline_) {
     confirm_server_index_ = sel_server_;
     confirm_deadline_ = now + kConfirmWindowSec;
-    ShowToast("Press Triangle again to delete " + p->Label());
+    ShowToast("Press Triangle again to delete " + p->Label(), icon::kDelete);
     return;
   }
   confirm_server_index_ = -1;
@@ -182,7 +183,7 @@ void App::StartConnect() {
 
   const ServerProfile* p = config_.At(sel_server_);
   if (!p) {
-    ShowToast("Press Options to add a server");
+    ShowToast("Press Options to add a server", icon::kAdd);
     return;
   }
 

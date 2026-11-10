@@ -8,6 +8,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "icons.h"
 #include "keymap.h"
 
 using namespace appdetail;
@@ -94,6 +95,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     row.RegisterMember("now_time", &ChannelRow::now_time);
     row.RegisterMember("progress_style", &ChannelRow::progress_style);
     row.RegisterMember("has_now", &ChannelRow::has_now);
+    row.RegisterMember("playing", &ChannelRow::playing);
   }
   ctor.RegisterArray<std::vector<ChannelRow>>();
 
@@ -116,6 +118,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     row.RegisterMember("progress", &RecRow::progress);
     row.RegisterMember("resumable", &RecRow::resumable);
     row.RegisterMember("watched", &RecRow::watched);
+    row.RegisterMember("playing", &RecRow::playing);
   }
   ctor.RegisterArray<std::vector<RecRow>>();
 
@@ -133,7 +136,10 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
   ctor.Bind("status", &bind_status_);
   ctor.Bind("server", &bind_server_);
   ctor.Bind("clock", &bind_clock_);
+  ctor.Bind("date", &bind_date_);
   ctor.Bind("toast", &bind_toast_);
+  ctor.Bind("toast_icon", &bind_toast_icon_);
+  ctor.Bind("fullscreen", &bind_fullscreen_);
   ctor.Bind("servers", &server_rows_);
   ctor.Bind("sel_server", &sel_server_);
   ctor.Bind("server_count", &server_count_);
@@ -337,6 +343,17 @@ void App::Update() {
     if (bind_clock_ != buf) {
       bind_clock_ = buf;
       model_.DirtyVariable("clock");
+      char date[48] = {};
+      std::strftime(date, sizeof(date), "%A %e %B", &tm);
+      Rml::String text = date;
+      // "%e" pads a one-digit day with a space.
+      const size_t pad = text.find("  ");
+      if (pad != Rml::String::npos)
+	text.erase(pad, 1);
+      if (bind_date_ != text) {
+	bind_date_ = text;
+	model_.DirtyVariable("date");
+      }
     }
   }
 
@@ -360,7 +377,8 @@ void App::Update() {
 	  SaveRecordingPosition(true);
 	  playing_dvr_id_ = 0; // saved; StopPlayback() has nothing to add
 	  StopPlayback();
-	  ShowToast(known && !entry.title.empty() ? "Finished: " + entry.title : "Finished");
+	  ShowToast(known && !entry.title.empty() ? "Finished: " + entry.title : "Finished",
+		    icon::kDone);
 	  return;
 	}
       // The position, now and then, in case the app does not get to stop.
@@ -373,10 +391,14 @@ void App::Update() {
     }
   UpdateSleepTimer();
 
+  // Behind the menus, the now-playing chip follows what plays.
+  if (VideoBehind())
+    UpdateWatchOverlay();
+
   // Watch info bar: refresh while visible (cheap; only dirties on change),
   // then auto-hide. The bar stays up while a recording is paused, and while
   // the playback menu is open, so the transport and the tracks show.
-  if (bind_watching_ && bind_info_visible_)
+  if (bind_watching_ && bind_fullscreen_ && bind_info_visible_)
     {
       UpdateWatchOverlay();
       if (Now() > info_deadline_ && !bind_menu_open_ && !(player_ && player_->IsPaused()))
@@ -572,7 +594,14 @@ void App::ActivateSelection()
     {
     case Zone::Channels:
       if (sel_channel_ >= 0 && sel_channel_ < (int)channels_.size())
-	PlayChannel(channels_[sel_channel_].id);
+	{
+	  // The channel that plays behind the menus: back to it, not tuned
+	  // in again.
+	  if (VideoBehind() && channels_[sel_channel_].id == playing_channel_id_)
+	    SetFullscreen(true);
+	  else
+	    PlayChannel(channels_[sel_channel_].id);
+	}
       break;
     case Zone::Epg:
       ToggleRecordSelectedEvent();
@@ -613,11 +642,13 @@ void App::EnsureRowVisible(const char* list_id, int index, float row_pitch)
   list->SetScrollTop(target);
 }
 
-void App::ShowToast(const std::string& text)
+void App::ShowToast(const std::string& text, const char* icon)
 {
   bind_toast_ = text;
+  bind_toast_icon_ = icon ? icon : "";
   toast_deadline_ = Now() + kToastSec;
   model_.DirtyVariable("toast");
+  model_.DirtyVariable("toast_icon");
 }
 
 // ---------------------------------------------------------------------------
@@ -648,10 +679,49 @@ void App::ProcessEvent(Rml::Event& event)
 
 void App::HandleKeyMain(Rml::Event& event, int key)
 {
-  if (bind_watching_)
+  if (bind_watching_ && bind_fullscreen_)
     {
       HandleKeyWatch(event, key);
       return;
+    }
+
+  // Over a video playing behind the menus, a few keys are about it.
+  if (VideoBehind())
+    {
+      switch (keymap::Command(key))
+	{
+	case keymap::Cmd::Options: // the playback menu, with "Full screen"
+	  OpenWatchMenu();
+	  event.StopPropagation();
+	  return;
+	case keymap::Cmd::Audio:
+	  CycleAudioTrack(+1);
+	  event.StopPropagation();
+	  return;
+	case keymap::Cmd::PlayPause:
+	  // A recording pauses and plays on, as from full screen; live TV
+	  // can't, and the key starts what is highlighted as ever.
+	  if (player_->IsRecordingPlayback())
+	    {
+	      const bool paused = player_->TogglePause();
+	      ShowToast(paused ? "Paused" : "Playing", paused ? icon::kPause : icon::kPlay);
+	      event.StopPropagation();
+	      return;
+	    }
+	  break;
+	case keymap::Cmd::SeekBack:
+	case keymap::Cmd::SeekForward:
+	  if (player_->CanSeek())
+	    {
+	      const bool back = keymap::Command(key) == keymap::Cmd::SeekBack;
+	      player_->SeekRelative((back ? -10 : 10) * 1000000LL);
+	      ShowToast(back ? "-10 s" : "+10 s", back ? icon::kRewind : icon::kForward);
+	    }
+	  event.StopPropagation();
+	  return;
+	default:
+	  break;
+	}
     }
 
   switch (keymap::Command(key))
@@ -721,7 +791,7 @@ void App::HandleKeyMain(Rml::Event& event, int key)
       else if (player_ && player_->IsPlaying())
 	{
 	  StopPlayback();
-	  ShowToast("Playback stopped");
+	  ShowToast("Playback stopped", icon::kStop);
 	}
       else if (section_ == Section::Recordings)
 	SetSection(Section::Channels);
@@ -734,7 +804,7 @@ void App::HandleKeyMain(Rml::Event& event, int key)
       if (!player_ || !player_->IsPlaying())
 	return;
       StopPlayback();
-      ShowToast("Playback stopped");
+      ShowToast("Playback stopped", icon::kStop);
       break;
 
     // Play starts whatever is highlighted, but only where that is what the
