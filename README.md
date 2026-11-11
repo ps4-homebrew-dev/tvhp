@@ -30,9 +30,9 @@ connection that carries the channel list and the guide.
 - Seek steps that grow while you keep pressing (10 s → 30 s → 1 min → 5 min),
   "ends at" for recordings, and the tracks being played on the info bar.
 - **Video behind the menus**, as in Kodi — Back from full screen brings the
-  guide or the recordings up over the picture, which plays on behind them,
-  with what plays in the top bar. Select it (or Options → Full screen) to go
-  back to it; Back from the top of the menus stops it.
+  guide or the recordings up over the picture, which plays on behind them.
+  Select it (or Options → Full screen) to go back to it; Back from the top
+  of the menus stops it.
 - **Channel logos** — Tvheadend's own, in the channel list, the guide, the
   recordings and the player, kept on the console after the first time. With
   the server's image cache on, they come over the HTSP connection (`fileOpen`);

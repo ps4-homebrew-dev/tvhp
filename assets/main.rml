@@ -118,19 +118,6 @@
 				</div>
 				<span class="spacer"/>
 				<span class="player-status" data-if="player_status != ''">{{player_status}}</span>
-				<!-- Something playing behind the menus: what, and how far. -->
-				<div id="np-chip" data-if="watching && !fullscreen">
-					<span class="np-chip-state" data-if="watch_recorded && watch_paused">&#xE132;</span>
-					<span class="np-chip-state" data-if="watch_recorded && !watch_paused">&#xE140;</span>
-					<span class="np-chip-logo" data-if="!watch_recorded && watch_icon != 'none'" data-style-decorator="watch_icon"/>
-					<span class="np-chip-state" data-if="!watch_recorded && watch_icon == 'none'">&#xE195;</span>
-					<span class="np-chip-title">{{watch_name}}</span>
-					<span class="np-chip-sub" data-if="watch_now != '' && !watch_recorded">{{watch_now}}</span>
-					<span class="np-chip-sub" data-if="watch_recorded">{{watch_time}}</span>
-					<div class="np-chip-bar">
-						<div class="np-chip-played" data-style-width="watch_progress"/>
-					</div>
-				</div>
 				<div class="clockbox">
 					<div class="clock">{{clock}}</div>
 					<div class="date">{{date}}</div>

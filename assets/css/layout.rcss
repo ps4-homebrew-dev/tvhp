@@ -93,81 +93,10 @@
 	white-space: nowrap;
 }
 
-/* What plays behind the menus: a pill by the clock, with the channel or
- * the recording, and a hairline of progress along its bottom. */
-#np-chip {
-	position: relative;
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	flex: 0 1 auto;
-	min-width: 160px;
-	max-width: 640px;
-	height: 56px;
-	margin-right: 36px;
-	padding: 0px 24px 0px 18px;
-	background-color: #ffffff14;
-	border-radius: 28px;
-	overflow: hidden;
-	white-space: nowrap;
-	animation: 0.25s cubic-out fade-in;
-}
-
+/* Shared by the fades of menus, dialogs and the info bar. */
 @keyframes fade-in {
 	from { opacity: 0; }
 	to   { opacity: 1; }
-}
-
-.np-chip-state {
-	flex-shrink: 0;
-	margin-right: 12px;
-	font-size: 22px;
-	font-weight: bold;
-	color: #f5b453;
-}
-
-.np-chip-title {
-	flex: 0 1 auto;
-	min-width: 0px;
-	max-width: 260px;
-	font-size: 23px;
-	font-weight: bold;
-	color: #e8edf7;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.np-chip-sub {
-	flex: 0 1 auto;
-	min-width: 0px;
-	margin-left: 14px;
-	font-size: 21px;
-	color: #8593ab;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.np-chip-logo {
-	flex-shrink: 0;
-	width: 64px;
-	height: 34px;
-	margin-right: 14px;
-}
-
-.np-chip-bar {
-	position: absolute;
-	left: 24px;
-	right: 24px;
-	bottom: 6px;
-	height: 3px;
-	background-color: #ffffff1f;
-	border-radius: 2px;
-}
-
-.np-chip-played {
-	height: 3px;
-	background-color: #f5b453;
-	border-radius: 2px;
 }
 
 #topbar .clockbox {

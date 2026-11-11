@@ -402,7 +402,8 @@ void App::Update() {
     }
   UpdateSleepTimer();
 
-  // Behind the menus, the now-playing chip follows what plays.
+  // Behind the menus, the info bar is kept current for the way back to
+  // full screen.
   if (VideoBehind())
     UpdateWatchOverlay();
 
