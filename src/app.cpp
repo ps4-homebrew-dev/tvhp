@@ -138,7 +138,6 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
   ctor.Bind("dialog", &bind_dialog_);
   ctor.Bind("dialog_title", &bind_dialog_title_);
   ctor.Bind("status", &bind_status_);
-  ctor.Bind("server", &bind_server_);
   ctor.Bind("clock", &bind_clock_);
   ctor.Bind("date", &bind_date_);
   ctor.Bind("toast", &bind_toast_);
@@ -170,7 +169,6 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
   ctor.Bind("player_status", &bind_player_status_);
   ctor.Bind("watching", &bind_watching_);
   ctor.Bind("info_visible", &bind_info_visible_);
-  ctor.Bind("watch_num", &bind_watch_num_);
   ctor.Bind("watch_name", &bind_watch_name_);
   ctor.Bind("watch_now", &bind_watch_now_);
   ctor.Bind("watch_time", &bind_watch_time_);
@@ -275,14 +273,12 @@ void App::SwitchToMain() {
   view_ = View::Main;
   bind_view_ = "main";
   bind_status_.clear();
-  bind_server_ = client_.ServerInfo();
   section_ = Section::Channels;
   bind_section_ = "channels";
   zone_ = Zone::Channels;
   bind_zone_ = "channels";
   model_.DirtyVariable("view");
   model_.DirtyVariable("status");
-  model_.DirtyVariable("server");
   model_.DirtyVariable("section");
   model_.DirtyVariable("zone");
   RefreshFromClient(true);
@@ -532,12 +528,91 @@ void App::SetZone(Zone zone)
     case Zone::Channels:   bind_zone_ = "channels"; break;
     case Zone::Epg:        bind_zone_ = "epg"; break;
     case Zone::Recordings: bind_zone_ = "recordings"; break;
+    case Zone::Tabs:       bind_zone_ = "tabs"; break;
     default:               bind_zone_ = "channels"; break;
     }
   model_.DirtyVariable("zone");
 
   if (zone == Zone::Channels || zone == Zone::Epg)
     RebuildDetail();
+}
+
+bool App::HandleKeyTabs(keymap::Cmd cmd)
+{
+  switch (cmd)
+    {
+    case keymap::Cmd::Left:
+    case keymap::Cmd::TabPrev:
+      ShowSection(Section::Channels);
+      return true;
+    case keymap::Cmd::Right:
+    case keymap::Cmd::TabNext:
+      ShowSection(Section::Recordings);
+      return true;
+    case keymap::Cmd::Secondary:
+      ShowSection(section_ == Section::Channels ? Section::Recordings : Section::Channels);
+      return true;
+    case keymap::Cmd::Down:
+    case keymap::Cmd::Ok:
+      LeaveTabs();
+      return true;
+    // Nothing above the tabs, and nothing selected to act on.
+    case keymap::Cmd::Up:
+    case keymap::Cmd::PageUp:
+    case keymap::Cmd::PageDown:
+    case keymap::Cmd::Home:
+    case keymap::Cmd::End:
+    case keymap::Cmd::PlayPause:
+    case keymap::Cmd::Remove:
+      return true;
+    default:
+      return false;
+    }
+}
+
+bool App::AtTopOfList() const
+{
+  switch (zone_)
+    {
+    case Zone::Channels:   return sel_channel_ <= 0 || channel_rows_.empty();
+    case Zone::Epg:        return sel_epg_ <= 0 || epg_rows_.empty();
+    case Zone::Recordings: return sel_rec_ <= 0 || rec_rows_.empty();
+    default:               return false;
+    }
+}
+
+void App::EnterTabs()
+{
+  tabs_return_ = zone_;
+  SetZone(Zone::Tabs);
+}
+
+// Back into the section shown, where it was left when it is the one the
+// tabs were entered from.
+void App::LeaveTabs()
+{
+  if (section_ == Section::Recordings)
+    SetZone(Zone::Recordings);
+  else if (tabs_return_ == Zone::Epg && !epg_rows_.empty())
+    {
+      SetZone(Zone::Epg);
+      scroll_epg_pending_ = true;
+      model_.DirtyVariable("sel_epg");
+    }
+  else
+    SetZone(Zone::Channels);
+}
+
+// Switches section without leaving the tabs when they have the focus.
+void App::ShowSection(Section section)
+{
+  if (section == section_)
+    return;
+  const bool on_tabs = zone_ == Zone::Tabs;
+  SetSection(section);
+  tabs_return_ = zone_;
+  if (on_tabs)
+    SetZone(Zone::Tabs);
 }
 
 void App::MoveSelection(int delta)
@@ -738,10 +813,24 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	}
     }
 
+  // On the tabs: Left / Right pick one, and it shows at once; Down or
+  // cross go back into it. Options, Back, Stop and Guide work as from the
+  // lists.
+  if (zone_ == Zone::Tabs && HandleKeyTabs(keymap::Command(key)))
+    {
+      event.StopPropagation();
+      return;
+    }
+
   switch (keymap::Command(key))
     {
+    // Up from the top of a list goes onto the tabs, as on the PS4's own
+    // screens: the one way there for a TV remote, which has no L1 / R1.
     case keymap::Cmd::Up:
-      MoveSelection(-1);
+      if (AtTopOfList())
+	EnterTabs();
+      else
+	MoveSelection(-1);
       break;
     case keymap::Cmd::Down:
       MoveSelection(+1);

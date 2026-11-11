@@ -1036,19 +1036,6 @@ void Player::SetSubtitleScale(double scale) {
   SetDouble("sub-scale", scale);
 }
 
-void Player::SetNightMode(bool on) {
-  night_mode_ = on;
-  if (!mpv_)
-    return;
-  // dynaudnorm lifts what is quiet and holds back what is loud, over a
-  // short window, which is what a film's dialogue against its effects
-  // needs; it works on any channel layout.
-  const int rc = mpv_set_property_string(mpv_, "af",
-                                         on ? "lavfi=[dynaudnorm=f=150:g=15:p=0.9:m=20]" : "");
-  if (rc < 0)
-    std::fprintf(stderr, "mpv: night mode: %s\n", mpv_error_string(rc));
-}
-
 void Player::SetPreferredLanguages(const std::string& audio, const std::string& subs) {
   if (!mpv_)
     return;

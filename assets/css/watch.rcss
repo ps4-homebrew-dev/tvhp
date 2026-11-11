@@ -124,7 +124,7 @@ body.watching #toast {
 	align-items: center;
 }
 
-/* Live TV: the channel's logo with its number, or the number alone; a
+/* Live TV: the channel's logo, or a TV symbol while there is none; a
  * recording: playing or paused. */
 .osd-logo {
 	position: relative;
@@ -143,21 +143,6 @@ body.watching #toast {
 	height: 100%;
 }
 
-.osd-logo-num {
-	position: absolute;
-	right: -10px;
-	top: -10px;
-	min-width: 40px;
-	padding: 3px 8px;
-	font-size: 20px;
-	font-weight: bold;
-	text-align: center;
-	color: #241604;
-	background-color: #f5b453;
-	border-radius: 12px;
-}
-
-.osd-num,
 .osd-glyph {
 	box-sizing: border-box;
 	flex-shrink: 0;

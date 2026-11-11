@@ -218,8 +218,8 @@ bool HtspClient::Connect(const std::string& host, int port, const std::string& u
   htsp_version = (int)version;
   const char* server_name = htsmsg_get_str(reply, "servername");
   const char* server_ver = htsmsg_get_str(reply, "serverversion");
-  server_info = std::string(server_name ? server_name : "Tvheadend") + " " + (server_ver ? server_ver : "") +
-    " (HTSP v" + std::to_string(htsp_version) + ")";
+  std::fprintf(stderr, "htsp: %s %s, HTSP v%d\n", server_name ? server_name : "Tvheadend",
+	       server_ver ? server_ver : "", htsp_version);
 
   const void* challenge = nullptr;
   size_t challenge_len = 0;

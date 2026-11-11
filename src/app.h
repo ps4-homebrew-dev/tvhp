@@ -12,6 +12,7 @@
 #include "config.h"
 #include "htsp.h"
 #include "iconcache.h"
+#include "keymap.h"
 #include "player.h"
 
 // Owns the HTSP client, the player and the RmlUi document, and mediates
@@ -47,8 +48,9 @@ public:
 
 private:
   enum class View { Connect, Main };
-  // The main view shows either the channel guide or the recordings library;
-  // Square toggles between them.
+  // The main view shows either the channel guide or the recordings library,
+  // as two tabs along the top: Up from the top of a list onto them and
+  // Left / Right there, or L1 / R1, or Square.
   enum class Section { Channels, Recordings };
   enum class Zone {
     ServerList, // connect view: saved servers
@@ -56,6 +58,7 @@ private:
     Channels,   // main view: channel list
     Epg,        // main view: programme guide
     Recordings, // main view: recordings list
+    Tabs,       // main view: the Guide / Recordings tabs
   };
 
   // Rows exposed to the RmlUi data model.
@@ -147,6 +150,12 @@ private:
   void RebuildRecordingRows();
   void RebuildRecordingDetail();
   void MoveSelection(int delta);
+  // The tabs: Up from the top of a list onto them, Down back.
+  bool HandleKeyTabs(keymap::Cmd cmd); // false: not a tabs key
+  bool AtTopOfList() const;
+  void EnterTabs();
+  void LeaveTabs();
+  void ShowSection(Section section);
   void SetZone(Zone zone);
   void ActivateSelection();
   void PlayChannel(uint32_t channel_id);
@@ -236,7 +245,6 @@ private:
   Rml::String bind_dialog_;        // "", "add" or "edit"
   Rml::String bind_dialog_title_;
   Rml::String bind_status_;       // connect screen status line
-  Rml::String bind_server_;       // topbar server info
   Rml::String bind_clock_;        // topbar clock
   Rml::String bind_date_;         // topbar date, "Tuesday 10 November"
   Rml::String bind_toast_icon_;
@@ -252,7 +260,6 @@ private:
   bool bind_watching_ = false;     // something plays (full screen or behind)
   bool bind_fullscreen_ = false;   // ... full screen, the menus hidden
   bool bind_info_visible_ = false; // watch info bar shown (auto-hides)
-  Rml::String bind_watch_num_;
   Rml::String bind_watch_name_;
   Rml::String bind_watch_now_;
   Rml::String bind_watch_time_;
@@ -317,6 +324,7 @@ private:
   View view_ = View::Connect;
   Section section_ = Section::Channels;
   Zone zone_ = Zone::ServerList;
+  Zone tabs_return_ = Zone::Channels; // where Up onto the tabs came from
   uint32_t playing_channel_id_ = 0;
   uint32_t playing_dvr_id_ = 0;
 

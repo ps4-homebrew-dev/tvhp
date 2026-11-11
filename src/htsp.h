@@ -220,7 +220,6 @@ public:
 
   void Disconnect();
 
-  std::string ServerInfo() const { return server_info; }
   // Recording playback needs fileOpen, which arrived in HTSP v8.
   bool SupportsFileApi() const { return htsp_version >= 8; }
   bool SupportsPlayPosition() const { return htsp_version >= 27; }
@@ -285,7 +284,6 @@ private:
 
   std::atomic<uint64_t> generation{0};
 
-  std::string server_info;
   int htsp_version = 0;
 
   StreamCallbacks stream_cbs;

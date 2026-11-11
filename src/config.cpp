@@ -89,9 +89,8 @@ void ServerConfig::Load(const std::string& path)
       if (key.compare(0, 7, "player.") == 0)
 	{
 	  const std::string name = key.substr(7);
-	  if (name == "night")
-	    player_.night_mode = std::atoi(val.c_str()) != 0;
-	  else if (name == "fit")
+	  // Others (player.night, from older builds) are passed over.
+	  if (name == "fit")
 	    player_.fit = std::clamp(std::atoi(val.c_str()), 0, 2);
 	  else if (name == "audio_delay")
 	    player_.audio_delay = std::clamp(std::atof(val.c_str()), -10.0, 10.0);
@@ -156,8 +155,7 @@ bool ServerConfig::Save(const std::string& path) const
 
   f << "# tvhp saved servers. Passwords are stored in the clear.\n";
   f << "last=" << last_used_ << "\n";
-  f << "player.night=" << (player_.night_mode ? 1 : 0) << "\n"
-    << "player.fit=" << player_.fit << "\n"
+  f << "player.fit=" << player_.fit << "\n"
     << "player.audio_delay=" << player_.audio_delay << "\n"
     << "player.sub_scale=" << player_.sub_scale << "\n"
     << "player.alang=" << player_.audio_lang << "\n"

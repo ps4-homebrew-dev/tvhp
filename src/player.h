@@ -128,10 +128,6 @@ public:
   // 1.0 = normal.
   void SetSubtitleScale(double scale);
   double SubtitleScale() const { return sub_scale_; }
-  // Dynamic range compression, for watching late without waking the house:
-  // quiet dialogue up, explosions down.
-  void SetNightMode(bool on);
-  bool NightMode() const { return night_mode_; }
   // Languages tried first when a stream opens, as mpv's alang/slang lists
   // ("swe,eng"); "" = the stream's default. A subtitle track in a preferred
   // language is switched on by itself; with none, subtitles start off.
@@ -219,7 +215,6 @@ private:
   double audio_delay_ = 0.0;
   double sub_delay_ = 0.0;
   double sub_scale_ = 1.0;
-  bool night_mode_ = false;
 
   mutable std::mutex status_mutex_;
   std::string status_;

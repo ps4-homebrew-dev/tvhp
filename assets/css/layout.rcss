@@ -37,8 +37,9 @@
 	padding: 0px 64px;
 }
 
-/* The two places, Guide and Recordings: a pill each, the one shown in the
- * accent, between L1 and R1, which switch them (Square toggles too). */
+/* The two places, Guide and Recordings: a pill each. Like the lists, the
+ * one shown is lit, and in the accent while the tabs have the focus (Up
+ * from the top of a list). L1 / R1 and Square switch them from anywhere. */
 #tabs {
 	display: flex;
 	flex-direction: row;
@@ -70,39 +71,18 @@
 	font-weight: bold;
 }
 
-/* The shoulder buttons, small and quiet at either end of the tabs. */
-.tabkey {
-	box-sizing: border-box;
-	width: 46px;
-	padding: 4px 0px;
-	font-size: 16px;
-	font-weight: bold;
-	text-align: center;
-	color: #8593ab;
-	background-color: #ffffff0f;
-	border-radius: 8px;
-}
-.tabkey:first-child {
-	margin-right: 8px;
-}
-.tabkey:last-child {
-	margin-left: 8px;
+.tab.selected {
+	color: #e8edf7;
+	background-color: #ffffff1f;
 }
 
-.tab.selected {
+#tabs.focused {
+	background-color: #ffffff14;
+}
+#tabs.focused .tab.selected {
 	color: #241604;
 	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
 	box-shadow: #f5b45340 0px 4px 18px 0px;
-}
-
-#topbar .server {
-	flex: 0 1 auto;
-	margin-left: 28px;
-	font-size: 20px;
-	color: #5a6478;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 #topbar .player-status {
@@ -138,8 +118,7 @@
 	to   { opacity: 1; }
 }
 
-.np-chip-state,
-.np-chip-num {
+.np-chip-state {
 	flex-shrink: 0;
 	margin-right: 12px;
 	font-size: 22px;

@@ -104,10 +104,9 @@
 		<div id="main-view" data-if="view == 'main'">
 
 			<div id="topbar">
-				<!-- The two places, as tabs, between the shoulder buttons that
-				     switch them, as PS4 screens with tabs show it. -->
-				<div id="tabs">
-					<span class="tabkey">L1</span>
+				<!-- The two places, as tabs: Up from the top of a list onto
+				     them, Left / Right to pick (or L1 / R1 from anywhere). -->
+				<div id="tabs" data-class-focused="zone == 'tabs'">
 					<div class="tab" data-class-selected="section == 'channels'"
 					     data-event-click="select_section('channels')">
 						<span class="tab-icon">&#xE195;</span><span class="tab-label">Guide</span>
@@ -116,9 +115,7 @@
 					     data-event-click="select_section('recordings')">
 						<span class="tab-icon">&#xE0D4;</span><span class="tab-label">Recordings</span>
 					</div>
-					<span class="tabkey">R1</span>
 				</div>
-				<span class="server">{{server}}</span>
 				<span class="spacer"/>
 				<span class="player-status" data-if="player_status != ''">{{player_status}}</span>
 				<!-- Something playing behind the menus: what, and how far. -->
@@ -126,7 +123,7 @@
 					<span class="np-chip-state" data-if="watch_recorded && watch_paused">&#xE132;</span>
 					<span class="np-chip-state" data-if="watch_recorded && !watch_paused">&#xE140;</span>
 					<span class="np-chip-logo" data-if="!watch_recorded && watch_icon != 'none'" data-style-decorator="watch_icon"/>
-					<span class="np-chip-num" data-if="!watch_recorded && watch_icon == 'none'">{{watch_num}}</span>
+					<span class="np-chip-state" data-if="!watch_recorded && watch_icon == 'none'">&#xE195;</span>
 					<span class="np-chip-title">{{watch_name}}</span>
 					<span class="np-chip-sub" data-if="watch_now != '' && !watch_recorded">{{watch_now}}</span>
 					<span class="np-chip-sub" data-if="watch_recorded">{{watch_time}}</span>
@@ -155,8 +152,8 @@
 						     data-class-playing="ch.playing"
 						     data-event-click="select_channel(it_index)">
 							<div class="chnum">{{ch.number}}</div>
-							<!-- The logo (Tvheadend's, fetched over HTSP), or the
-							     channel's number while there is none. -->
+							<!-- The logo (Tvheadend's), or a TV symbol while there
+							     is none. -->
 							<div class="chlogo" data-if="ch.icon != 'none'"><div class="logo-img" data-style-decorator="ch.icon"/></div>
 							<div class="chlogo empty" data-if="ch.icon == 'none'">&#xE195;</div>
 							<div class="chinfo">
@@ -271,9 +268,8 @@
 			<div class="osd-row">
 				<div class="osd-logo" data-if="!watch_recorded && watch_icon != 'none'">
 					<div class="osd-logo-img" data-style-decorator="watch_icon"/>
-					<span class="osd-logo-num">{{watch_num}}</span>
 				</div>
-				<div class="osd-num" data-if="!watch_recorded && watch_icon == 'none'">{{watch_num}}</div>
+				<div class="osd-glyph" data-if="!watch_recorded && watch_icon == 'none'">&#xE195;</div>
 				<div class="osd-glyph" data-if="watch_recorded && watch_paused">&#xE132;</div>
 				<div class="osd-glyph" data-if="watch_recorded && !watch_paused">&#xE140;</div>
 				<div class="osd-main">

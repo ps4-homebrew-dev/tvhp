@@ -24,7 +24,6 @@ struct ServerProfile {
 // adjustments of the playback menu, and the languages last picked, so a
 // subtitle choice follows from channel to channel.
 struct PlayerPrefs {
-  bool night_mode = false;
   int fit = 0;               // Player::Fit
   double audio_delay = 0.0;  // seconds
   double sub_scale = 1.0;
@@ -39,10 +38,9 @@ struct PlayerPrefs {
 // user=/pass= lines, is still read and silently migrated on the next save):
 //
 //   last=1
-//   player.night=0          (PlayerPrefs, before the first [server]; older
-//   player.fit=0             builds read them as an incomplete server and
-//   player.audio_delay=0     drop it)
-//   player.sub_scale=1
+//   player.fit=0            (PlayerPrefs, before the first [server]; older
+//   player.audio_delay=0     builds read them as an incomplete server and
+//   player.sub_scale=1       drop it)
 //   player.alang=swe
 //   player.slang=
 //   [server]

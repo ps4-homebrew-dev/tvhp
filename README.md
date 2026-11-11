@@ -23,7 +23,7 @@ connection that carries the channel list and the guide.
   (HTSP 27+), so it is shared with Kodi and every other client. The list shows
   how far each recording got and which have been watched.
 - **Playback menu** (Options while watching) — audio track, subtitles, speed,
-  night mode, picture fit, audio and subtitle delay, subtitle size, sleep timer
+  picture fit, audio and subtitle delay, subtitle size, sleep timer
   (live TV can sleep at the end of the programme on air).
 - **DVB subtitles on live TV and recordings.** A language you pick stays picked
   from channel to channel, as does turning them off.
@@ -64,7 +64,8 @@ command is reachable from any of them; the pad mapping lives in
 | Command | Pad | Remote | Keyboard |
 | --- | --- | --- | --- |
 | Navigate | D-pad, left stick (held: repeats) | D-pad | Arrows |
-| Guide / Recordings tab; while watching: zap, seek ±5 min | L1 / R1 | — | — |
+| Guide / Recordings tabs | Up from the top of a list, then Left / Right; or L1 / R1 | Up, then Left / Right | Up, then Left / Right |
+| While watching: zap, seek ±5 min | L1 / R1 | — | — |
 | Page up / down | L2 / R2 | P+ / P- | Page Up / Page Down |
 | First / last row | — | — | Home / End |
 | Select: connect, watch, record, play; play/pause | Cross | Enter | Enter |

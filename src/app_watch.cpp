@@ -2,7 +2,7 @@
 // auto-hiding info bar, the transport controls, and the playback menu.
 //
 // Much of it follows jtplay's player screen: the menu (tracks, subtitles,
-// speed, night mode, picture, delays, sleep timer), seek steps that grow
+// speed, picture, delays, sleep timer), seek steps that grow
 // while pressed, the track labels and "ends at" on the bar, and the resume
 // question. Tvheadend keeps the resume positions, so they are shared with
 // every other client of the server.
@@ -363,12 +363,12 @@ void App::ShowWatchInfo(double seconds)
 
 void App::UpdateWatchOverlay()
 {
-  Rml::String num, name, now_title, now_time, progress = "0%", ends;
+  Rml::String name, now_title, now_time, progress = "0%", ends;
   const bool recorded = player_ && player_->IsRecordingPlayback();
 
   if (recorded)
     {
-      // Recording: the "channel number" slot becomes a play/pause marker and
+      // Recording: a play/pause marker in place of the channel logo, and
       // the progress bar tracks the position in the file.
       HtspDvrEntry entry;
       if (client_.GetDvrEntry(playing_dvr_id_, &entry))
@@ -387,7 +387,6 @@ void App::UpdateWatchOverlay()
       const int64_t dur = player_->DurationUs();
       now_time = FmtPosition(pos) + (dur > 0 ? " / " + FmtPosition(dur) : "");
       progress = Percent(pos, dur);
-      // The OSD shows playing or paused in place of a channel number.
       if (player_->DurationReliable())
 	ends = EndsAt(pos, dur, player_->Speed());
 
@@ -420,7 +419,6 @@ void App::UpdateWatchOverlay()
 
       if (ch)
 	{
-	  num = std::to_string(ch->number);
 	  name = ch->name;
 	  const HtspClient::NowNext nn = client_.GetNowNext(ch->id);
 	  if (nn.has_now)
@@ -444,7 +442,6 @@ void App::UpdateWatchOverlay()
   // The run of seeks is over: away with the bubble.
   if (Now() > seek_bubble_until_)
     set(bind_watch_seek_, Rml::String(), "watch_seek");
-  set(bind_watch_num_, num, "watch_num");
   set(bind_watch_icon_, recorded || !playing_channel_id_ ? Rml::String("none")
 					     : IconDecorator(playing_channel_id_),
       "watch_icon");
@@ -596,7 +593,6 @@ void App::CycleSubtitleTrack(int direction)
 void App::ApplyPlayerPrefs()
 {
   const PlayerPrefs& prefs = config_.Player();
-  player_->SetNightMode(prefs.night_mode);
   player_->SetFit((Player::Fit)std::clamp(prefs.fit, 0, (int)Player::Fit::Count - 1));
   player_->SetAudioDelay(prefs.audio_delay);
   player_->SetSubtitleScale(prefs.sub_scale);
@@ -606,7 +602,6 @@ void App::ApplyPlayerPrefs()
 void App::SavePlayerPrefs()
 {
   PlayerPrefs& prefs = config_.Player();
-  prefs.night_mode = player_->NightMode();
   prefs.fit = (int)player_->GetFit();
   prefs.audio_delay = player_->AudioDelay();
   prefs.sub_scale = player_->SubtitleScale();
@@ -690,9 +685,6 @@ void App::OpenWatchMenu()
 	  player_->SetSpeed(kSpeeds[i]);
 	}});
     }
-  menu_items_.push_back({"Night mode",
-    [this] { return std::string(player_->NightMode() ? "On" : "Off"); },
-    [this](int) { player_->SetNightMode(!player_->NightMode()); SavePlayerPrefs(); }});
   menu_items_.push_back({"Picture",
     [this] { return std::string(FitName(player_->GetFit())); },
     [this](int d) {
