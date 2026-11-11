@@ -149,21 +149,12 @@ body.watching #toast {
 	width: 120px;
 	height: 100px;
 	margin-right: 36px;
-	padding-top: 12px;
-	font-size: 60px;
-	font-weight: bold;
-	text-align: center;
-	color: #f5b453;
-	background-color: #f5b4531a;
-	border-radius: 20px;
-}
-
-.osd-glyph {
-	padding-top: 18px;
 	font-size: 54px;
-	font-weight: normal;
+	line-height: 100px;
+	text-align: center;
 	color: #ffffff;
 	background-color: #ffffff12;
+	border-radius: 20px;
 }
 
 .osd-main {
@@ -265,8 +256,8 @@ body.watching #toast {
 	height: 180px;
 	margin-left: -90px;
 	margin-top: -90px;
-	padding-top: 42px;
 	font-size: 90px;
+	line-height: 178px; /* inside the border: the icon in the middle */
 	text-align: center;
 	color: #ffffff;
 	background-color: #0a0e1880;

@@ -30,8 +30,8 @@
 	width: 84px;
 	height: 84px;
 	margin-right: 26px;
-	padding-top: 14px;
 	font-size: 48px;
+	line-height: 84px;
 	text-align: center;
 	color: #241604;
 	decorator: linear-gradient(135deg, #f7c26c 0%, #e9a13c 100%);
@@ -85,8 +85,8 @@
 	width: 64px;
 	height: 64px;
 	margin-right: 22px;
-	padding-top: 14px;
 	font-size: 32px;
+	line-height: 64px;
 	text-align: center;
 	color: #f5b453;
 	background-color: #f5b4531a;

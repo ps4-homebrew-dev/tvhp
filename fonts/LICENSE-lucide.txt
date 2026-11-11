@@ -1,5 +1,6 @@
 fonts/lucide.ttf: a subset of the Lucide icon font (lucide-static 0.460.0,
-https://lucide.dev), used for the UI's icons (src/icons.h).
+https://lucide.dev), used for the UI's icons (src/icons.h), with each icon
+moved to the middle of its box (tools/cut-lucide.py).
 
 ISC License
 

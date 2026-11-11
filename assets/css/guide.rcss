@@ -56,8 +56,9 @@
 
 /* No logo (yet): the tile holds a TV. */
 .chlogo.empty {
-	padding: 14px 0px 0px 0px;
+	padding: 0px;
 	font-size: 34px;
+	line-height: 68px;
 	text-align: center;
 	color: #ffffff2e;
 }

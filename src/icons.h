@@ -7,9 +7,13 @@
 // can sit inside a string. Lucide puts its glyphs in the Private Use Area,
 // which no text font has, so they never clash with what the text says.
 //
-// To add one: look its code up in lucide-static's font/info.json and cut
-// the font again with it (fontTools' subsetter, all the codes below plus
-// the new one).
+// Each icon is centred in its box (Lucide's own font draws them from the
+// left edge), so text-align and line-height centre it: an icon alone in a
+// tile is centred by giving the tile a line-height of its height.
+//
+// To add one: look its code up in lucide-static's font/info.json, use it
+// here or in the RML, and cut the font again with tools/cut-lucide.py,
+// which takes every icon the sources use.
 #ifndef ICONS_H
 #define ICONS_H
 
