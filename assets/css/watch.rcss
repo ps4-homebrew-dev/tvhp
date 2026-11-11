@@ -183,7 +183,12 @@ body.watching #toast {
 	text-overflow: ellipsis;
 }
 
+/* The two lines under the title have fixed heights: they are there,
+ * empty, before the stream's tracks are known, so the bar keeps its size
+ * when they come. */
 .osd-desc {
+	flex-shrink: 0;
+	height: 31px;
 	margin-top: 4px;
 	font-size: 26px;
 	color: #aab6cc;
@@ -195,6 +200,8 @@ body.watching #toast {
 .osd-tracks {
 	display: flex;
 	flex-direction: row;
+	flex-shrink: 0;
+	height: 31px; /* one .osd-track */
 	margin-top: 14px;
 	white-space: nowrap;
 	overflow: hidden;

@@ -262,7 +262,10 @@
 				<div class="osd-glyph" data-if="watch_recorded && !watch_paused">&#xE140;</div>
 				<div class="osd-main">
 					<div class="osd-title">{{watch_name}}</div>
-					<div class="osd-desc" data-if="watch_now != ''">{{watch_now}}</div>
+					<!-- Both lines below keep their room while empty (no guide
+					     data; the tracks not known yet), so the bar never
+					     changes height. -->
+					<div class="osd-desc">{{watch_now}}</div>
 					<!-- What is being decoded, and the settings that are on. -->
 					<div class="osd-tracks">
 						<span class="osd-track" data-if="watch_vtrack != ''">{{watch_vtrack}}</span>
