@@ -168,7 +168,7 @@ For the PS4, with the ps4-homebrew-dev SDK, the same CMakeLists.txt builds
 ## Known limitations
 
 - Logos given as `picon://` (picons without a picon folder set on the server)
-  cannot be fetched; those channels show a plain TV symbol. Set the picon path
+  cannot be fetched; those channels show their number instead. Set the picon path
   in Tvheadend (Configuration → General → Base) and they come as files.
 - Only programme-based recording is exposed. The client can also schedule a
   manual time range (`HtspClient::RecordTimespan`), but nothing in the UI

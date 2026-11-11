@@ -31,18 +31,7 @@
 	background-color: #ffffff0e;
 }
 
-/* The channel number, then its logo on a tile. */
-.chnum {
-	box-sizing: border-box;
-	display: block;
-	width: 50px;
-	margin-right: 14px;
-	font-size: 26px;
-	font-weight: bold;
-	text-align: right;
-	color: #6f7b92;
-}
-
+/* The channel's logo on a tile. */
 .chlogo {
 	box-sizing: border-box;
 	flex-shrink: 0;
@@ -54,7 +43,19 @@
 	border-radius: 12px;
 }
 
-/* No logo (yet): the tile holds a TV. */
+/* No logo (yet): the tile holds the channel's number, in its place. */
+.chlogo.number {
+	padding: 0px;
+	font-size: 36px;
+	font-weight: bold;
+	line-height: 68px;
+	text-align: center;
+	color: #c5cee0;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
+/* Nor a number: a TV. */
 .chlogo.empty {
 	padding: 0px;
 	font-size: 34px;
@@ -128,12 +129,12 @@
 	white-space: nowrap;
 }
 
-/* Selected while the guide has focus: a lighter row, its number lit. */
+/* Selected while the guide has focus: a lighter row. */
 .channel-row.selected {
 	background-color: #ffffff17;
 }
-.channel-row.selected .chnum {
-	color: #f5b453;
+.channel-row.selected .chlogo.number {
+	color: #ffffff;
 }
 .channel-row.selected .chlogo {
 	background-color: #ffffff1a;
@@ -147,9 +148,6 @@
 #channels.active .channel-row.selected {
 	decorator: linear-gradient(90deg, #f7c26c 0%, #e9a13c 100%);
 	box-shadow: #f5b45338 0px 6px 24px 0px;
-}
-#channels.active .channel-row.selected .chnum {
-	color: #241604;
 }
 /* Logos are drawn for dark backgrounds: on the amber bar, the tile stays
  * dark. */

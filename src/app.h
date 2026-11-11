@@ -251,6 +251,7 @@ private:
   Rml::String bind_toast_;
   Rml::String bind_epg_channel_;  // heading of the guide pane
   Rml::String bind_epg_icon_ = "none";   // its channel's logo
+  Rml::String bind_watch_num_;  // the number, for a channel without a logo
   Rml::String bind_watch_icon_ = "none"; // the logo of the channel playing
   Rml::String bind_detail_title_;
   Rml::String bind_detail_meta_;

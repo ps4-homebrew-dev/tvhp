@@ -161,6 +161,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
   ctor.Bind("rec_count", &rec_count_);
   ctor.Bind("epg_channel", &bind_epg_channel_);
   ctor.Bind("epg_icon", &bind_epg_icon_);
+  ctor.Bind("watch_num", &bind_watch_num_);
   ctor.Bind("watch_icon", &bind_watch_icon_);
   ctor.Bind("detail_title", &bind_detail_title_);
   ctor.Bind("detail_meta", &bind_detail_meta_);

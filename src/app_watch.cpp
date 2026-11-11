@@ -363,7 +363,7 @@ void App::ShowWatchInfo(double seconds)
 
 void App::UpdateWatchOverlay()
 {
-  Rml::String name, now_title, now_time, progress = "0%", ends;
+  Rml::String num, name, now_title, now_time, progress = "0%", ends;
   const bool recorded = player_ && player_->IsRecordingPlayback();
 
   if (recorded)
@@ -419,6 +419,8 @@ void App::UpdateWatchOverlay()
 
       if (ch)
 	{
+	  if (ch->number)
+	    num = std::to_string(ch->number);
 	  name = ch->name;
 	  const HtspClient::NowNext nn = client_.GetNowNext(ch->id);
 	  if (nn.has_now)
@@ -442,6 +444,7 @@ void App::UpdateWatchOverlay()
   // The run of seeks is over: away with the bubble.
   if (Now() > seek_bubble_until_)
     set(bind_watch_seek_, Rml::String(), "watch_seek");
+  set(bind_watch_num_, num, "watch_num");
   set(bind_watch_icon_, recorded || !playing_channel_id_ ? Rml::String("none")
 					     : IconDecorator(playing_channel_id_),
       "watch_icon");

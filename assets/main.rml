@@ -138,11 +138,11 @@
 						     data-class-selected="it_index == sel_channel"
 						     data-class-playing="ch.playing"
 						     data-event-click="select_channel(it_index)">
-							<div class="chnum">{{ch.number}}</div>
-							<!-- The logo (Tvheadend's), or a TV symbol while there
-							     is none. -->
+							<!-- The logo (Tvheadend's); while there is none, the
+							     channel's number, or a TV for a channel without one. -->
 							<div class="chlogo" data-if="ch.icon != 'none'"><div class="logo-img" data-style-decorator="ch.icon"/></div>
-							<div class="chlogo empty" data-if="ch.icon == 'none'">&#xE195;</div>
+							<div class="chlogo number" data-if="ch.icon == 'none' && ch.number != ''">{{ch.number}}</div>
+							<div class="chlogo empty" data-if="ch.icon == 'none' && ch.number == ''">&#xE195;</div>
 							<div class="chinfo">
 								<div class="chname">{{ch.name}}<span class="chlive" data-if="ch.playing">&#xE48A;</span></div>
 								<div class="chnow">{{ch.now_title}}</div>
@@ -256,7 +256,8 @@
 				<div class="osd-logo" data-if="!watch_recorded && watch_icon != 'none'">
 					<div class="osd-logo-img" data-style-decorator="watch_icon"/>
 				</div>
-				<div class="osd-glyph" data-if="!watch_recorded && watch_icon == 'none'">&#xE195;</div>
+				<div class="osd-glyph osd-number" data-if="!watch_recorded && watch_icon == 'none' && watch_num != ''">{{watch_num}}</div>
+				<div class="osd-glyph" data-if="!watch_recorded && watch_icon == 'none' && watch_num == ''">&#xE195;</div>
 				<div class="osd-glyph" data-if="watch_recorded && watch_paused">&#xE132;</div>
 				<div class="osd-glyph" data-if="watch_recorded && !watch_paused">&#xE140;</div>
 				<div class="osd-main">

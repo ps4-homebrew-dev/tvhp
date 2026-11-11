@@ -35,7 +35,7 @@ void App::RebuildChannelRows()
   for (const HtspChannel& ch : channels_)
     {
       ChannelRow row;
-      row.number = ch.number ? std::to_string(ch.number) : "-";
+      row.number = ch.number ? std::to_string(ch.number) : "";
       row.name = ch.name.empty() ? ("Channel " + std::to_string(ch.id)) : ch.name;
 
       const HtspClient::NowNext nn = client_.GetNowNext(ch.id);

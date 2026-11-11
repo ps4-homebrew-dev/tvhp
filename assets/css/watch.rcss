@@ -157,6 +157,16 @@ body.watching #toast {
 	border-radius: 20px;
 }
 
+/* A channel without a logo: its number, as wide as a logo, so the title
+ * stays put from channel to channel. */
+.osd-number {
+	width: 200px;
+	font-size: 48px;
+	font-weight: bold;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
 .osd-main {
 	display: flex;
 	flex-direction: column;
