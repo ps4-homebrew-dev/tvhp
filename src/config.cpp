@@ -89,7 +89,6 @@ void ServerConfig::Load(const std::string& path)
       if (key.compare(0, 7, "player.") == 0)
 	{
 	  const std::string name = key.substr(7);
-	  // Others (player.night, from older builds) are passed over.
 	  if (name == "fit")
 	    player_.fit = std::clamp(std::atoi(val.c_str()), 0, 2);
 	  else if (name == "audio_delay")
@@ -103,8 +102,7 @@ void ServerConfig::Load(const std::string& path)
 	  continue;
 	}
 
-      // Keys outside any [server] block are the old single-server format;
-      // treat them as the first (implicit) profile.
+      // Before any [server]: the old single-server format.
       if (!in_section)
 	in_section = true;
 
@@ -121,8 +119,6 @@ void ServerConfig::Load(const std::string& path)
     }
   flush();
 
-  // Environment overrides apply to the entry that will be preselected, which
-  // keeps TVH_HOST=... ./tvhp working the way it always has.
   const char* env_host = std::getenv("TVH_HOST");
   const char* env_port = std::getenv("TVH_PORT");
   const char* env_user = std::getenv("TVH_USER");
@@ -146,8 +142,7 @@ void ServerConfig::Load(const std::string& path)
 
 bool ServerConfig::Save(const std::string& path) const
 {
-  // Written beside it, then renamed over it: the app closed half-way (the
-  // PS button) leaves the old file, never half a new one.
+  // Written beside it and renamed: never half a file.
   const std::string tmp = path + ".new";
   std::ofstream f(tmp, std::ios::trunc);
   if (!f)

@@ -35,22 +35,21 @@ namespace {
     return 0;
   }
 
-  constexpr int kHtspVersion = 35;      // protocol version we speak
+  constexpr int kHtspVersion = 35;
   constexpr int kMaxMessageSize = 10 * 1024 * 1024;
-  constexpr int kReadPollMs = 250;      // reader thread poll granularity
+  constexpr int kReadPollMs = 250; // how often the reader looks at 'running'
   constexpr int kRequestTimeoutMs = 5000;
 
-  // updateDvrEntry / fileClose "playcount": not a count but what to do with
-  // it (Tvheadend's HTSP_DVR_PLAYCOUNT_*).
+  // updateDvrEntry's and fileClose's "playcount" says what to do with the
+  // count (Tvheadend's HTSP_DVR_PLAYCOUNT_*).
   constexpr uint32_t kPlayCountReset = 0;
   constexpr uint32_t kPlayCountSet = 1; // 1 unless counted already
   constexpr uint32_t kPlayCountKeep = 0x7ffffffe;
   constexpr uint32_t kPlayCountIncrement = 0x7fffffff;
-  // fileRead can carry up to a megabyte of payload and may have to wait for
-  // the server to flush an in-progress recording, so it gets more headroom.
+  // A fileRead may wait for a running recording's next data.
   constexpr int kFileRequestTimeoutMs = 15000;
-  constexpr int64_t kEpgWindowSec = 24 * 3600; // how far ahead we ask for EPG
-  constexpr time_t kPruneIntervalSec = 600;    // drop expired events this often
+  constexpr int64_t kEpgWindowSec = 24 * 3600;
+  constexpr time_t kPruneIntervalSec = 600;
 
   std::vector<HtspChannel> SortedChannels(const std::map<uint32_t, HtspChannel>& by_id)
   {
@@ -66,7 +65,7 @@ namespace {
     return out;
   }
 
-  // Extracts a human-readable error from an HTSP reply, if any.
+  // The error of a reply, if any.
   std::string ReplyError(htsmsg_t* reply)
   {
     if (!reply)
@@ -145,7 +144,7 @@ htsmsg_t* HtspClient::ReadMessage(int timeout_ms, std::string& error)
       return nullptr;
     }
 
-  // The message takes ownership of 'buf' and frees it on htsmsg_destroy.
+  // The message owns 'buf' from here.
   htsmsg_t* msg = htsmsg_binary_deserialize(buf, len, buf);
   if (!msg)
     error = "failed to deserialize HTSP message";
@@ -158,10 +157,8 @@ htsmsg_t* HtspClient::ReadMessage(int timeout_ms, std::string& error)
 
 bool HtspClient::Connect(const std::string& host, int port, const std::string& user, const std::string& pass, std::string& error)
 {
-  Disconnect(); // joins any previous reader thread and closes the socket
-
+  Disconnect();
   {
-    // Fresh session: forget everything from a previous connection.
     std::lock_guard<std::mutex> lock(channels_mutex);
     channels.clear();
     epg.clear();
@@ -172,16 +169,22 @@ bool HtspClient::Connect(const std::string& host, int port, const std::string& u
   }
   generation++;
 
+  // Errors are said for a person on a sofa, not for the log.
+  const std::string where = host + ":" + std::to_string(port);
   char errbuf[256] = {};
   sock = htsp_tcp_connect(host.c_str(), port, errbuf, sizeof(errbuf), 5000);
   if (sock < 0)
     {
-      error = std::string("connect failed: ") + errbuf;
+      if (!std::strcmp(errbuf, "The specified host is unknown"))
+	error = "Can't find " + host;
+      else if (!std::strcmp(errbuf, "Connection attempt timed out"))
+	error = where + " does not answer";
+      else
+	error = "Can't reach " + where + " (" + errbuf + ")";
       return false;
     }
 
-  // Replies are paired to requests via the echoed "seq" field; we tag every
-  // request with one (as Kodi's pvr.hts does), including the handshake.
+  // Replies are matched to requests by "seq", the handshake's too.
   auto read_reply = [this](uint32_t want_seq, std::string& err) -> htsmsg_t* {
     for (;;)
       {
@@ -191,7 +194,7 @@ bool HtspClient::Connect(const std::string& host, int port, const std::string& u
 	uint32_t seq = 0;
 	if (!htsmsg_get_u32(m, "seq", &seq) && seq == want_seq)
 	  return m;
-	htsmsg_destroy(m); // unrelated async message; ignore during handshake
+	htsmsg_destroy(m);
       }
   };
 
@@ -209,7 +212,10 @@ bool HtspClient::Connect(const std::string& host, int port, const std::string& u
   htsmsg_t* reply = read_reply(seq, error);
   if (!reply)
     {
-      error = "hello failed: " + error;
+      // Tvheadend's web port (9981) given for its HTSP port (9982), most
+      // likely.
+      std::fprintf(stderr, "htsp: hello: %s\n", error.c_str());
+      error = where + " is no Tvheadend HTSP port (usually 9982)";
       return false;
     }
 
@@ -254,33 +260,36 @@ bool HtspClient::Connect(const std::string& host, int port, const std::string& u
   reply = read_reply(seq, error);
   if (!reply)
     {
-      error = "authenticate failed: " + error;
+      error = "No answer from " + where + " (" + error + ")";
       return false;
     }
+  uint32_t noaccess = 0;
+  const bool denied = !htsmsg_get_u32(reply, "noaccess", &noaccess) && noaccess;
   const std::string auth_error = ReplyError(reply);
   htsmsg_destroy(reply);
+  if (denied)
+    {
+      error = user.empty() ? where + " wants a username and password"
+			   : "Wrong username or password for " + host;
+      return false;
+    }
   if (!auth_error.empty())
     {
-      error = "authenticate failed: " + auth_error;
+      error = "Tvheadend refused the login: " + auth_error;
       return false;
     }
   return true;
 }
 
 // ---------------------------------------------------------------------------
-// Async metadata + reader thread
+// The reader thread
 // ---------------------------------------------------------------------------
 
-void HtspClient::StartAsync(std::function<void(std::vector<HtspChannel>)> on_sync,
-			    std::function<void(std::vector<HtspChannel>)> on_update)
+void HtspClient::StartAsync()
 {
-  sync_cb = std::move(on_sync);
-  update_cb = std::move(on_update);
-
   running = true;
   reader = std::thread(&HtspClient::ReaderLoop, this);
 
-  // Channels plus a rolling EPG window (eventAdd/eventUpdate/eventDelete).
   htsmsg_t* msg = htsmsg_create_map();
   htsmsg_add_str(msg, "method", "enableAsyncMetadata");
   htsmsg_add_u32(msg, "epg", 1);
@@ -299,21 +308,13 @@ void HtspClient::ReaderLoop()
       if (!msg)
 	{
 	  if (error == "timeout")
-	    continue; // poll granularity; check running flag and retry
-	  running = false;
-	  generation++; // let pollers notice the connection loss
-	  // Fail all waiters so callers don't block until timeout.
-	  std::lock_guard<std::mutex> lock(pending_mutex);
-	  for (auto& [seq, slot] : pending)
-	    slot->done = true;
-	  pending_cv.notify_all();
+	    continue;
 	  break;
 	}
 
       uint32_t seq = 0;
       if (!htsmsg_get_u32(msg, "seq", &seq))
 	{
-	  // Reply to a pending request.
 	  std::lock_guard<std::mutex> lock(pending_mutex);
 	  auto it = pending.find(seq);
 	  if (it != pending.end())
@@ -321,7 +322,7 @@ void HtspClient::ReaderLoop()
 	      it->second->reply = msg;
 	      it->second->done = true;
 	      pending_cv.notify_all();
-	      continue; // ownership moved to the waiter
+	      continue; // the waiter's now
 	    }
 	  htsmsg_destroy(msg);
 	  continue;
@@ -330,6 +331,15 @@ void HtspClient::ReaderLoop()
       HandleAsyncMessage(msg);
       htsmsg_destroy(msg);
     }
+
+  // Lost, or disconnected: whoever waits for a reply hears now, not at the
+  // timeout, and the UI notices.
+  running = false;
+  generation++;
+  std::lock_guard<std::mutex> lock(pending_mutex);
+  for (auto& [seq, slot] : pending)
+    slot->done = true;
+  pending_cv.notify_all();
 }
 
 void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
@@ -354,11 +364,7 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	ch.name = name;
       if (const char* icon = htsmsg_get_str(msg, "channelIcon"))
 	ch.icon = icon;
-      if (!htsmsg_get_u32(msg, "eventId", &u32))
-	ch.event_id = u32;
       generation++;
-      if (initial_sync_done && update_cb)
-	update_cb(SortedChannels(channels));
     }
   else if (!std::strcmp(method, "channelDelete"))
     {
@@ -367,7 +373,6 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	return;
       std::lock_guard<std::mutex> lock(channels_mutex);
       channels.erase(id);
-      // Drop this channel's EPG too.
       if (auto it = epg.find(id); it != epg.end())
 	{
 	  for (const auto& [start, ev] : it->second)
@@ -375,8 +380,6 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	  epg.erase(it);
 	}
       generation++;
-      if (initial_sync_done && update_cb)
-	update_cb(SortedChannels(channels));
     }
   else if (!std::strcmp(method, "eventAdd") || !std::strcmp(method, "eventUpdate"))
     {
@@ -416,8 +419,6 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
       std::lock_guard<std::mutex> lock(channels_mutex);
       initial_sync_done = true;
       generation++;
-      if (sync_cb)
-	sync_cb(SortedChannels(channels));
     }
   else if (!std::strcmp(method, "subscriptionStart"))
     {
@@ -500,12 +501,12 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
 	    stream_cbs.on_stop();
 	}
       else
-	stream_cbs.on_status(status ? status : ""); // "" = the trouble is over
+	stream_cbs.on_status(status ? status : "");
     }
 }
 
 // ---------------------------------------------------------------------------
-// EPG storage
+// Events
 // ---------------------------------------------------------------------------
 
 void HtspClient::UpsertEventLocked(htsmsg_t* msg, bool is_update)
@@ -514,8 +515,7 @@ void HtspClient::UpsertEventLocked(htsmsg_t* msg, bool is_update)
   if (htsmsg_get_u32(msg, "eventId", &event_id))
     return;
 
-  // Start from the previous version of the event: eventUpdate only carries
-  // the fields that changed.
+  // An update carries only what changed.
   HtspEvent ev;
   if (auto idx = event_index.find(event_id); idx != event_index.end())
     {
@@ -523,14 +523,13 @@ void HtspClient::UpsertEventLocked(htsmsg_t* msg, bool is_update)
       if (auto it = by_start.find(idx->second.start); it != by_start.end())
 	{
 	  ev = it->second;
-	  by_start.erase(it); // re-inserted below (start time may change)
+	  by_start.erase(it); // back below; the start may have changed
 	}
       event_index.erase(idx);
     }
   else if (is_update)
     {
-      // Update for an event we never saw; treat it as an add if it carries a
-      // channelId, otherwise there is nothing we can do with it.
+      // An update of an event never seen is an add, given its channel.
       uint32_t channel_id = 0;
       if (htsmsg_get_u32(msg, "channelId", &channel_id))
 	return;
@@ -594,7 +593,7 @@ void HtspClient::PruneExpiredLocked(time_t now)
 }
 
 // ---------------------------------------------------------------------------
-// Thread-safe snapshots for the UI
+// Snapshots
 // ---------------------------------------------------------------------------
 
 bool HtspClient::SyncCompleted() const
@@ -641,8 +640,7 @@ HtspClient::NowNext HtspClient::GetNowNext(uint32_t channel_id) const
     return result;
 
   const auto& by_start = ch->second;
-  // First event starting after 'now'; the one before it (if any) may still
-  // be airing.
+  // The event before the first to start after now may be on.
   auto after = by_start.upper_bound(now);
   if (after != by_start.begin())
     {
@@ -711,9 +709,9 @@ bool HtspClient::Subscribe(uint32_t channel_id, std::string& error)
   htsmsg_add_str(msg, "method", "subscribe");
   htsmsg_add_u32(msg, "subscriptionId", sid);
   htsmsg_add_u32(msg, "channelId", channel_id);
-  htsmsg_add_str(msg, "profile", "htsp"); // server-side HTSP stream profile
+  htsmsg_add_str(msg, "profile", "htsp");
 
-  // Set before the reply arrives: subscriptionStart may beat it.
+  // Set first: subscriptionStart may come before the reply.
   subscription_id = sid;
 
   htsmsg_t* reply = SendRequest(msg, kRequestTimeoutMs, error);
@@ -742,14 +740,11 @@ void HtspClient::Unsubscribe()
   htsmsg_t* msg = htsmsg_create_map();
   htsmsg_add_str(msg, "method", "unsubscribe");
   htsmsg_add_u32(msg, "subscriptionId", sid);
-  std::string error;
-  if (htsmsg_t* reply = SendRequest(msg, kRequestTimeoutMs, error))
-    htsmsg_destroy(reply);
+  SendNoReply(msg);
 }
 
-
 // ---------------------------------------------------------------------------
-// DVR storage
+// Recordings
 // ---------------------------------------------------------------------------
 
 void HtspClient::UpsertDvrEntryLocked(htsmsg_t* msg)
@@ -758,8 +753,7 @@ void HtspClient::UpsertDvrEntryLocked(htsmsg_t* msg)
   if (htsmsg_get_u32(msg, "id", &id))
     return;
 
-  // dvrEntryUpdate only carries the fields that changed, so start from the
-  // previous version of the entry.
+  // An update carries only what changed.
   HtspDvrEntry& e = dvr[id];
   const uint32_t old_event = e.event_id;
   e.id = id;
@@ -801,8 +795,7 @@ void HtspClient::UpsertDvrEntryLocked(htsmsg_t* msg)
   if (const char* s = htsmsg_get_str(msg, "error"))
     e.error = s;
 
-  // Keep the event -> recording index in sync (the association can change,
-  // e.g. when a scheduled entry loses its EPG event).
+  // A recording can lose its event, or get another.
   if (old_event && old_event != e.event_id)
     dvr_by_event.erase(old_event);
   if (e.event_id)
@@ -827,8 +820,6 @@ std::vector<HtspDvrEntry> HtspClient::GetDvrEntries() const
   for (const auto& [id, e] : dvr)
     out.push_back(e);
 
-  // Pending recordings first (soonest first), then everything else with the
-  // most recent at the top - which is the order a "Recordings" list wants.
   std::sort(out.begin(), out.end(), [](const HtspDvrEntry& a, const HtspDvrEntry& b) {
     const bool ap = a.IsPending(), bp = b.IsPending();
     if (ap != bp)
@@ -870,26 +861,31 @@ bool HtspClient::GetDvrEntry(uint32_t dvr_id, HtspDvrEntry* out) const
 }
 
 // ---------------------------------------------------------------------------
-// DVR requests
+// Requests
 // ---------------------------------------------------------------------------
 
-bool HtspClient::SimpleRequest(htsmsg_t* msg, std::string& error, uint32_t* out_id)
+void HtspClient::SendNoReply(htsmsg_t* msg)
+{
+  // A seq nobody waits for: the reader drops the reply.
+  {
+    std::lock_guard<std::mutex> lock(pending_mutex);
+    htsmsg_add_u32(msg, "seq", next_seq++);
+  }
+  std::string error;
+  if (!SendMessage(msg, error))
+    std::fprintf(stderr, "htsp: %s\n", error.c_str());
+}
+
+bool HtspClient::SimpleRequest(htsmsg_t* msg, std::string& error)
 {
   htsmsg_t* reply = SendRequest(msg, kRequestTimeoutMs, error);
   if (!reply)
     return false;
 
-  // addDvrEntry and friends answer with success=0 plus an error string
-  // rather than the generic "error" field, so check both.
+  // The DVR's methods answer success=0 with an error, not just "error".
   uint32_t success = 1;
   htsmsg_get_u32(reply, "success", &success);
   std::string err = ReplyError(reply);
-  if (out_id)
-    {
-      uint32_t id = 0;
-      if (!htsmsg_get_u32(reply, "id", &id))
-	*out_id = id;
-    }
   htsmsg_destroy(reply);
 
   if (!success)
@@ -905,12 +901,12 @@ bool HtspClient::SimpleRequest(htsmsg_t* msg, std::string& error, uint32_t* out_
   return true;
 }
 
-bool HtspClient::RecordEvent(uint32_t event_id, std::string& error, uint32_t* out_id)
+bool HtspClient::RecordEvent(uint32_t event_id, std::string& error)
 {
   htsmsg_t* msg = htsmsg_create_map();
   htsmsg_add_str(msg, "method", "addDvrEntry");
   htsmsg_add_u32(msg, "eventId", event_id);
-  return SimpleRequest(msg, error, out_id);
+  return SimpleRequest(msg, error);
 }
 
 void HtspClient::SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watched)
@@ -935,14 +931,7 @@ void HtspClient::SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watche
   htsmsg_add_u32(msg, "playposition", seconds);
   if (watched)
     htsmsg_add_u32(msg, "playcount", kPlayCountIncrement);
-  // A sequence number nobody waits for: the reader drops the reply.
-  {
-    std::lock_guard<std::mutex> lock(pending_mutex);
-    htsmsg_add_u32(msg, "seq", next_seq++);
-  }
-  std::string error;
-  if (!SendMessage(msg, error))
-    std::fprintf(stderr, "htsp updateDvrEntry: %s\n", error.c_str());
+  SendNoReply(msg);
 }
 
 void HtspClient::SetWatched(uint32_t dvr_id, bool watched)
@@ -967,13 +956,7 @@ void HtspClient::SetWatched(uint32_t dvr_id, bool watched)
   htsmsg_add_u32(msg, "id", dvr_id);
   htsmsg_add_u32(msg, "playposition", 0);
   htsmsg_add_u32(msg, "playcount", watched ? kPlayCountSet : kPlayCountReset);
-  {
-    std::lock_guard<std::mutex> lock(pending_mutex);
-    htsmsg_add_u32(msg, "seq", next_seq++);
-  }
-  std::string error;
-  if (!SendMessage(msg, error))
-    std::fprintf(stderr, "htsp updateDvrEntry: %s\n", error.c_str());
+  SendNoReply(msg);
 }
 
 bool HtspClient::CancelDvrEntry(uint32_t dvr_id, std::string& error)
@@ -993,7 +976,7 @@ bool HtspClient::DeleteDvrEntry(uint32_t dvr_id, std::string& error)
 }
 
 // ---------------------------------------------------------------------------
-// File access (recording playback)
+// Files
 // ---------------------------------------------------------------------------
 
 bool HtspClient::FileOpen(const std::string& path, uint32_t* handle, int64_t* size, std::string& error)
@@ -1055,7 +1038,6 @@ int64_t HtspClient::FileRead(uint32_t handle, void* buf, int64_t size, int64_t o
     {
       if (!htsmsg_get_bin(reply, "data", &bin, &bin_len))
 	{
-	  // The server may return less than requested; never more.
 	  got = (int64_t)bin_len;
 	  if (got > size)
 	    got = size;
@@ -1064,7 +1046,7 @@ int64_t HtspClient::FileRead(uint32_t handle, void* buf, int64_t size, int64_t o
 	}
       else
 	{
-	  got = 0; // no data field: treat as end of file
+	  got = 0; // no data: the end
 	}
     }
   htsmsg_destroy(reply);
@@ -1109,14 +1091,11 @@ void HtspClient::FileClose(uint32_t handle)
   htsmsg_t* msg = htsmsg_create_map();
   htsmsg_add_str(msg, "method", "fileClose");
   htsmsg_add_u32(msg, "id", handle);
-  // Closing a recording counts as having watched it, unless asked not to
-  // (HTSP 27+). It is counted when it is watched to the end instead, by
-  // SavePlayPosition(); a peek at the first minutes is no viewing.
+  // Closing a recording counts a viewing unless told not to (HTSP 27+);
+  // SavePlayPosition() counts one at the end instead.
   if (SupportsPlayPosition())
     htsmsg_add_u32(msg, "playcount", kPlayCountKeep);
-  std::string error;
-  if (htsmsg_t* reply = SendRequest(msg, kRequestTimeoutMs, error))
-    htsmsg_destroy(reply);
+  SendNoReply(msg);
 }
 
 void HtspClient::Disconnect()

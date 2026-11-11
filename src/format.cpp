@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdio>
 #include <ctime>
 
@@ -15,10 +16,21 @@ std::string FmtHM(int64_t t) {
 }
 
 std::string FmtRange(int64_t start, int64_t stop) {
-  return FmtHM(start) + " - " + FmtHM(stop);
+  return FmtHM(start) + " – " + FmtHM(stop);
 }
 
-// "Today", "Tomorrow", "Yesterday" or "Wed 15 Jul".
+namespace {
+
+// strftime's day of the month is padded ("%e") or zero-filled ("%d").
+std::string Date(const struct tm& tm, const char* weekday, const char* month) {
+  char day[16] = {}, mon[16] = {};
+  std::strftime(day, sizeof(day), weekday, &tm);
+  std::strftime(mon, sizeof(mon), month, &tm);
+  return std::string(day) + " " + std::to_string(tm.tm_mday) + " " + mon;
+}
+
+} // namespace
+
 std::string FmtDay(int64_t t) {
   const time_t now = time(nullptr);
   time_t tt = (time_t)t;
@@ -34,9 +46,14 @@ std::string FmtDay(int64_t t) {
     return "Tomorrow";
   if (day_ev == day_now - 1)
     return "Yesterday";
-  char buf[32] = {};
-  strftime(buf, sizeof(buf), "%a %e %b", &tm_ev);
-  return buf;
+  return Date(tm_ev, "%a", "%b");
+}
+
+std::string FmtLongDate(int64_t t) {
+  time_t tt = (time_t)t;
+  struct tm tm;
+  localtime_r(&tt, &tm);
+  return Date(tm, "%A", "%B");
 }
 
 std::string FmtDuration(int64_t start, int64_t stop) {
@@ -49,7 +66,6 @@ std::string FmtDuration(int64_t start, int64_t stop) {
   return out;
 }
 
-// Microseconds -> "1:23:45" / "23:45", for the playback position.
 std::string FmtPosition(int64_t us) {
   if (us < 0)
     return "--:--";
@@ -63,7 +79,24 @@ std::string FmtPosition(int64_t us) {
   return buf;
 }
 
-// Human-readable state for a DVR entry.
+std::string FmtEpisode(uint32_t season, uint32_t episode) {
+  std::string out;
+  if (season)
+    out += "S" + std::to_string(season);
+  if (episode)
+    out += "E" + std::to_string(episode);
+  return out;
+}
+
+std::string Synopsis(const std::string& title, const std::string& subtitle,
+                     const std::string& description, const std::string& summary) {
+  std::string out;
+  if (!subtitle.empty() && subtitle != title)
+    out = subtitle + "\n";
+  out += !description.empty() ? description : summary;
+  return out;
+}
+
 std::string DvrStateLabel(const HtspDvrEntry& e) {
   if (e.IsRecording())
     return "Recording now";

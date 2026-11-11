@@ -1,8 +1,6 @@
 /*
- * Main screen scaffold: topbar (tabs, now playing, clock), content columns,
- * the generic pane/list chrome each view sits in, and the toast. There are
- * no button hints, as on the PS4's own screens: cross selects, circle goes
- * back, and the Options button opens a menu with everything else.
+ * The main screen's frame: the top bar (tabs, clock), the panes and their
+ * lists, and the toast. No button hints, as on the PS4's own screens.
  */
 
 /* Above the video shade, which is positioned. */
@@ -37,9 +35,8 @@
 	padding: 0px 64px;
 }
 
-/* The two places, Guide and Recordings: a pill each. Like the lists, the
- * one shown is lit, and in the accent while the tabs have the focus (Up
- * from the top of a list). L1 / R1 and Square switch them from anywhere. */
+/* Guide and Recordings. The one shown is lit, and amber while the tabs
+ * have the focus. */
 #tabs {
 	display: flex;
 	flex-direction: row;
@@ -93,7 +90,7 @@
 	white-space: nowrap;
 }
 
-/* Shared by the fades of menus, dialogs and the info bar. */
+/* Menus, dialogs, the info bar. */
 @keyframes fade-in {
 	from { opacity: 0; }
 	to   { opacity: 1; }
@@ -211,15 +208,6 @@
 	height: 0px;
 }
 
-/* Shown in place of the rows when there are none. */
-.empty {
-	display: block;
-	padding: 40px 24px;
-	font-size: 26px;
-	color: #8593ab;
-	text-align: center;
-}
-
 /* ------------------------------------------------------------------ */
 /* Toast                                                              */
 /* ------------------------------------------------------------------ */
@@ -243,7 +231,7 @@
 	animation: 0.25s cubic-out toast-in;
 }
 
-/* The Options menu is on the right: notices keep clear of it. */
+/* Clear of the menu blade. */
 body.blade #toast {
 	right: 700px;
 }

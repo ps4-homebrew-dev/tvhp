@@ -1,8 +1,7 @@
-// Guide view: turns the client's channel and EPG snapshots into the rows and
-// detail text bound to the data model.
+// The guide: channel rows, the selected channel's programmes and their
+// details, and channel logos.
 #include <algorithm>
 #include <ctime>
-#include <sstream>
 
 #include "app.h"
 #include "app_internal.h"
@@ -16,7 +15,7 @@ void App::RebuildChannelRows()
   channels_ = client_.GetChannels();
   channel_count_ = (int)channels_.size();
 
-  // Keep the same channel selected across rebuilds if possible.
+  // The same channel stays selected.
   if (selected_channel_id_)
     {
       for (size_t i = 0; i < channels_.size(); ++i)
@@ -89,7 +88,6 @@ void App::RebuildEpgRows()
       row.title = ev.title.empty() ? "Untitled programme" : ev.title;
       row.now = (ev.start <= now && now < ev.stop);
 
-      // Recording marker, so the guide shows at a glance what is set to record.
       HtspDvrEntry entry;
       if (client_.GetDvrEntryForEvent(ev.id, &entry) && entry.IsPending())
 	{
@@ -99,12 +97,11 @@ void App::RebuildEpgRows()
 
       if (!row.now)
 	{
-	  // The airing row shows only its "Now" badge; the day label first
-	  // appears on the next event (e.g. "Today" if it's the same day).
+	  // The day, where it changes; what is on now has NOW instead.
 	  std::string day = FmtDay(ev.start);
 	  if (day != last_day)
 	    {
-	      row.day = day; // only shown when the day changes
+	      row.day = day;
 	      last_day = day;
 	    }
 	}
@@ -130,31 +127,19 @@ void App::RebuildDetail()
   if (zone_ == Zone::Epg && sel_epg_ >= 0 && sel_epg_ < (int)epg_events_.size())
     ev = &epg_events_[sel_epg_];
   else if (!epg_events_.empty())
-    ev = &epg_events_[0]; // channel zone: show what's airing / up next
+    ev = &epg_events_[0]; // in the channel list: what is on
 
   if (ev)
     {
       bind_detail_title_ = ev->title.empty() ? "Untitled programme" : ev->title;
 
-      std::ostringstream meta;
-      meta << FmtDay(ev->start) << "  ·  " << FmtRange(ev->start, ev->stop)
-	   << "  ·  " << FmtDuration(ev->start, ev->stop);
-      if (ev->season || ev->episode)
-	{
-	  meta << "  ·  ";
-	  if (ev->season)
-	    meta << "S" << ev->season;
-	  if (ev->episode)
-	    meta << "E" << ev->episode;
-	}
-      bind_detail_meta_ = meta.str();
+      bind_detail_meta_ = FmtDay(ev->start) + "  ·  " + FmtRange(ev->start, ev->stop) +
+			  "  ·  " + FmtDuration(ev->start, ev->stop);
+      const std::string episode = FmtEpisode(ev->season, ev->episode);
+      if (!episode.empty())
+	bind_detail_meta_ += "  ·  " + episode;
 
-      if (!ev->subtitle.empty() && ev->subtitle != ev->title)
-	bind_detail_desc_ = ev->subtitle + "\n";
-      if (!ev->description.empty())
-	bind_detail_desc_ += ev->description;
-      else if (!ev->summary.empty())
-	bind_detail_desc_ += ev->summary;
+      bind_detail_desc_ = Synopsis(ev->title, ev->subtitle, ev->description, ev->summary);
       if (bind_detail_desc_.empty())
 	bind_detail_desc_ = "No description available.";
 
@@ -184,7 +169,7 @@ void App::RebuildDetail()
 }
 
 // ---------------------------------------------------------------------------
-// Channel icons
+// Channel logos
 // ---------------------------------------------------------------------------
 
 Rml::String App::IconDecorator(uint32_t channel_id)
@@ -193,8 +178,7 @@ Rml::String App::IconDecorator(uint32_t channel_id)
     if (ch.id == channel_id)
       {
 	const std::string path = icons_.Path(ch.icon);
-	// Quoted, so a path with spaces or parentheses stays one argument;
-	// "contain": logos come in every shape, and none is cropped.
+	// Quoted for spaces and parentheses; "contain" crops no logo.
 	return path.empty() ? Rml::String("none")
 			    : Rml::String("image(\"" + path + "\" contain)");
       }
@@ -224,12 +208,7 @@ void App::ApplyIcons()
     model_.DirtyVariable("recordings");
   if (sel_channel_ >= 0 && sel_channel_ < (int)channels_.size())
     {
-      const Rml::String icon = IconDecorator(channels_[sel_channel_].id);
-      if (bind_epg_icon_ != icon)
-	{
-	  bind_epg_icon_ = icon;
-	  model_.DirtyVariable("epg_icon");
-	}
+      Set(bind_epg_icon_, IconDecorator(channels_[sel_channel_].id), "epg_icon");
     }
   if (bind_watching_)
     UpdateWatchOverlay();

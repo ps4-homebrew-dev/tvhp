@@ -2,47 +2,26 @@
 
 #include <RmlUi/Core/Input.h>
 
-// Every key the UI reacts to, in one place.
+// Every key the UI reacts to, in one place. A pad (gamepad.cpp turns its
+// buttons into keys), a remote (SDL reports an HDMI-CEC remote's buttons as
+// keys) and a keyboard all end up on the same commands.
 //
-// Three input devices have to end up on the same set of commands:
-//
-//   * a game controller (the DualShock 4 on a PS4, any pad SDL knows on a
-//     PC), whose buttons are turned into key identifiers by gamepad.cpp,
-//   * a remote control or multimedia keyboard, whose media keys SDL reports
-//     as keyboard keys (RmlSDL::ConvertKey() in RmlUi_Platform_SDL.cpp),
-//   * an ordinary USB keyboard.
-//
-// The identifiers follow what remote controls send - the PS5 port of SDL2,
-// for which tvhp was first written, reports its HDMI-CEC remote this way -
-// and the pad and the keyboard are mapped onto the same keys. Two of those
-// decide the layout:
-//
-//   * "back" arrives as Escape, so Escape - not Backspace - is the cancel
-//     key, and Circle is mapped to Escape to match,
-//   * "play/pause" arrives as Space, so Space is a transport key and Square
-//     has moved to Tab.
-//
-// The consequence is that nothing here is reachable by a single device only:
-// every command below can be given from the pad, from the remote, or from a
-// keyboard, and the button hints in main.rml stay accurate for the pad.
+// The keys follow what a remote sends: its "back" arrives as Escape, so
+// Escape is the cancel key and Circle is Escape too; its play/pause arrives
+// as Space, so Space is a transport key and Square is Tab.
 
 namespace keymap {
 
-  // SDL reports the remote's rewind and fast-forward buttons as
-  // SDLK_AUDIOREWIND and SDLK_AUDIOFASTFORWARD. RmlUi has no identifiers for
-  // those, so take two of the slots it reserves for applications.
+  // A remote's rewind and fast forward, for which RmlUi has no keys.
   constexpr int KI_MEDIA_REWIND = Rml::Input::KI_FIRST_CUSTOM_KEY + 0;
   constexpr int KI_MEDIA_FAST_FORWARD = Rml::Input::KI_FIRST_CUSTOM_KEY + 1;
-  // The pad's L1 and R1, which switch tabs as everywhere on the PS4. Keys of
-  // their own rather than Page Up/Down, which the remote's P+/P- send and
-  // which page through a list.
+  // L1 and R1, apart from Page Up/Down (L2/R2, a remote's P+/P-).
   constexpr int KI_TAB_PREV = Rml::Input::KI_FIRST_CUSTOM_KEY + 2;
   constexpr int KI_TAB_NEXT = Rml::Input::KI_FIRST_CUSTOM_KEY + 3;
   static_assert(KI_TAB_NEXT <= Rml::Input::KI_LAST_CUSTOM_KEY,
                 "custom key identifiers must stay inside RmlUi's range");
 
-  // What a key means to the application. Each key maps to exactly one
-  // command; what a command does is up to the view that receives it.
+  // What a key means; what a command does is up to the view.
   enum class Cmd {
     None,
 
@@ -51,14 +30,14 @@ namespace keymap {
     Down,
     Left,
     Right,
-    PageUp,   // L2        | remote "p+"
-    PageDown, // R2        | remote "p-"
-    TabPrev,  // L1: Guide; while watching, as PageUp (zap, seek)
-    TabNext,  // R1: Recordings; while watching, as PageDown
+    PageUp,   // L2        | P+
+    PageDown, // R2        | P-
+    TabPrev,  // L1
+    TabNext,  // R1
     Home,
     End,
 
-    // Actions. The comments name the pad button, then the remote button.
+    // Actions: the pad's button | the remote's | the keyboard's.
     Ok,        // Cross     | enter          | Enter
     Back,      // Circle    | back, prev     | Escape, Backspace
     Secondary, // Square    | display        | Tab
@@ -66,15 +45,14 @@ namespace keymap {
     Options,   // Options   | menu, context  | Insert   (or hold Cross / Enter)
     Guide,     // Select    | guide          | F9 (no pad button on a PS4)
 
-    // Transport. Pad users reach these through Cross and the d-pad; the
-    // remote has dedicated buttons and they should do the obvious thing.
+    // A remote's transport keys; a pad does without.
     PlayPause,   // play/pause, pause
     Stop,        // stop
     SeekBack,    // rewind
     SeekForward, // fast forward
     SkipBack,    // |<
     SkipForward, // >|
-    Audio,       // the remote's audio key: next audio track
+    Audio,       // audio: the next audio track
   };
 
   constexpr Cmd Command(int key) {
@@ -93,10 +71,8 @@ namespace keymap {
     case Rml::Input::KI_RETURN:             return Cmd::Ok;
     case Rml::Input::KI_NUMPADENTER:        return Cmd::Ok;
 
-    // Backspace is a second cancel key for keyboards, and catches the
-    // remote's "prev" button, which SDL reports as Backspace. Views that
-    // contain a text field must therefore test for Escape directly rather
-    // than for Cmd::Back, or typing would close them.
+    // Backspace (a remote's "prev" too) is Back as well; a view with text
+    // fields tests for Escape instead.
     case Rml::Input::KI_ESCAPE:             return Cmd::Back;
     case Rml::Input::KI_BACK:               return Cmd::Back;
 
@@ -111,8 +87,7 @@ namespace keymap {
 
     case Rml::Input::KI_F9:                 return Cmd::Guide;
 
-    // The PS4's SDL sends an HDMI-CEC remote's audio key as F2 (and its
-    // display key as F4, above).
+    // An HDMI-CEC remote's audio key arrives as F2 (its display key as F4).
     case Rml::Input::KI_F2:                 return Cmd::Audio;
 
     case Rml::Input::KI_SPACE:              return Cmd::PlayPause;

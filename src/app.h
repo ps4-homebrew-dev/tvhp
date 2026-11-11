@@ -16,9 +16,9 @@
 #include "player.h"
 
 // Owns the HTSP client, the player and the RmlUi document, and mediates
-// between them. All RmlUi access happens on the main thread; changes coming
-// from the HTSP reader thread are picked up by polling client.Generation()
-// once per frame in Update().
+// between them. Everything here runs on the main thread; what the HTSP
+// reader thread changes is picked up by polling client_.Generation() in
+// Update().
 class App : public Rml::EventListener {
 public:
   App();
@@ -31,19 +31,19 @@ public:
     std::string cache_dir;  // channel icons; "" = not kept
   };
 
-  // Creates the data model and loads main.rml from the assets. Must be
-  // called before the first context update.
+  // Creates the data model and loads main.rml. Call before the first
+  // context update.
   bool Initialize(Rml::Context* context, const Options& options, std::string& error);
   void Shutdown();
 
   // Per-frame housekeeping; call before context->Update().
   void Update();
 
-  // Hook for the player to draw video beneath the UI; call between
-  // Backend::BeginFrame() and context->Render().
+  // Draws the video beneath the UI; call between Backend::BeginFrame() and
+  // context->Render().
   void RenderVideo(int width, int height);
 
-  // Rml::EventListener (document-level keydown, capture phase).
+  // Rml::EventListener: every keydown, before the document sees it.
   void ProcessEvent(Rml::Event& event) override;
 
 private:
@@ -61,7 +61,7 @@ private:
     Tabs,       // main view: the Guide / Recordings tabs
   };
 
-  // Rows exposed to the RmlUi data model.
+  // Rows of the data model's lists.
   struct ServerRow {
     Rml::String name;
     Rml::String detail;
@@ -101,36 +101,45 @@ private:
     Rml::String label;
     Rml::String value; // the current setting, "" for plain actions
   };
-  // An entry of the menu. 'value' reports the current setting; 'change' is
-  // called with -1/+1 for left/right and 0 for select. Entries without a
-  // value are actions: they close the menu when selected.
+  // An entry of a menu. 'value' reports the current setting; 'change' gets
+  // -1/+1 for left/right and 0 for cross. Entries without a value are
+  // actions, which close the menu.
   struct MenuItem {
     std::string label;
     std::function<std::string()> value;
     std::function<void(int)> change;
   };
   bool SetupDataModel(Rml::Context* context, std::string& error);
+  // Sets a bound variable, and marks it dirty if it changed.
+  template <typename T> void Set(T& variable, const T& value, const char* name) {
+    if (variable == value)
+      return;
+    variable = value;
+    model_.DirtyVariable(name);
+  }
 
   // --- Connect screen ----------------------------------------------------
   void RebuildServerRows();
   void LoadFormFromSelection();  // saved server -> dialog fields
-  // The add/edit dialog is modal over the server list. 'add_new' starts from
-  // a blank profile; otherwise the highlighted server is loaded for editing.
+  // The add/edit dialog, modal over the server list: a blank server, or the
+  // highlighted one.
   void OpenServerDialog(bool add_new);
   void CloseServerDialog();
   ServerProfile FormToProfile() const;
-  // Commits the edit fields to the profile list and closes the dialog.
-  // Connecting is a separate step, done from the server list.
+  // Saves the dialog's fields and closes it; connecting is left to the list.
   void SaveServer();
   void StartConnect();
   void PollConnectState();
+  // Connecting by itself: at launch, and after a lost connection, trying
+  // again ever less often until a key is pressed on the server list.
+  void ScheduleReconnect(int index, double delay);
+  void CancelReconnect();
   void DeleteSelectedServer();
   void OpenServerMenu();
-  void SetConnectZone(Zone zone);
   int CurrentFormRow(bool* in_input) const;
   void FocusFormField(int delta);  // up/down: label -> label, input -> input
-  // Focuses a row's text field with its text selected, so what the PS4
-  // keyboard types replaces it (the keyboard can only append).
+  // Focuses a row's text field with its text selected, so what the PS4's
+  // keyboard types replaces it (it can only append).
   bool EnterFormInput(int row);
   bool FocusFormInput();  // right: label -> input
   bool FocusFormLabel();  // left: input -> label (only at caret start)
@@ -139,8 +148,7 @@ private:
   // --- Main screen -------------------------------------------------------
   void SwitchToMain();
   void SwitchToConnect(const std::string& status);
-  // Drops the HTSP connection and goes back to the server list, so another
-  // server can be picked.
+  // Disconnects and goes back to the server list.
   void DisconnectToLogin();
   void SetSection(Section section);
   void RefreshFromClient(bool force);
@@ -164,52 +172,49 @@ private:
   // --- Recording (DVR) ---------------------------------------------------
   void ToggleRecordSelectedEvent();
   void PlaySelectedRecording();
-  // Triangle: cancels a pending recording or deletes a finished one.
+  // Triangle: cancels a pending recording or deletes a finished one, after
+  // asking.
   void RemoveSelectedRecording();
   void CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive);
   const HtspDvrEntry* SelectedRecording() const;
 
-  // --- Full-screen playback ("watching") ---------------------------------
+  // --- Watching ---------------------------------------------------------
   void EnterWatch();
   void ExitWatch();
-  void ShowWatchInfo(double seconds);
+  void ShowWatchInfo(); // for kWatchInfoSec
+  void HideWatchInfo();
   void UpdateWatchOverlay();
   void EnsureRowVisible(const char* list_id, int index, float row_pitch);
   // A notice for a few seconds, with an icon (src/icons.h) in front.
   void ShowToast(const std::string& text, const char* icon = nullptr);
 
-  // --- Video behind the menus (from jtplay) --------------------------------
-  // Back from full screen leaves the video playing behind the guide or the
-  // recordings, under a shade, as in Kodi; selecting what plays (or the
-  // Options menu's "Full screen") goes back to it, and Back from the top of
-  // the menus stops it.
+  // Back from full screen leaves the video playing behind the menus, under a
+  // shade, as in Kodi; Back again, or selecting what plays, brings it back.
   void SetFullscreen(bool on);
-
-  // --- Channel icons --------------------------------------------------------
-  // The logo of a channel as an RmlUi decorator ("image(...) contain"), or
-  // "none" while there is none (yet: IconCache fetches it).
-  Rml::String IconDecorator(uint32_t channel_id);
-  // Icons have arrived: the rows, the guide and the player show them.
-  void ApplyIcons();
   bool VideoBehind() const { return bind_watching_ && !bind_fullscreen_; }
-  // The list rows of what plays, marked as such.
+  // Marks the list rows of what plays.
   void MarkPlayingRows();
 
-  // --- Playback (from jtplay) ----------------------------------------------
-  // Recordings: asks whether to resume when the server has a position for
-  // it, then plays.
+  // --- Channel logos -------------------------------------------------------
+  // A channel's logo as a decorator ("image(...) contain"), or "none" while
+  // IconCache has none.
+  Rml::String IconDecorator(uint32_t channel_id);
+  // Logos have arrived: show them.
+  void ApplyIcons();
+
+  // --- Playback ------------------------------------------------------------
   void StartRecording(uint32_t dvr_id, int64_t start_seconds);
-  // Tells the server how far the recording that plays has got ('ended':
-  // all the way), so it resumes there on any client. Sent when playback
-  // stops and every kPositionSaveSec; skipped when nothing has changed.
+  // Tells the server how far the recording that plays has got ('ended': all
+  // the way), so it resumes there on any client. Sent when playback stops
+  // and every kPositionSaveSec, unless nothing has changed.
   void SaveRecordingPosition(bool ended = false);
-  // Left/right and the remote's rewind/fast forward: steps that grow while
-  // pressed in quick succession, with a bubble saying how far in all.
+  // A seek step; steps grow while pressed in quick succession, and a bubble
+  // says how far the run has gone.
   void SeekStep(int sign, bool large);
   void CycleAudioTrack(int direction);
   void CycleSubtitleTrack(int direction);
-  // A track picked by hand: its language is remembered and preferred from
-  // then on, so subtitles stay on (or off) from one channel to the next.
+  // A track picked by hand: its language is preferred from then on, so
+  // subtitles stay on (or off) from one channel to the next.
   void PickAudioTrack(const TrackInfo& track);
   void PickSubtitleTrack(const TrackInfo* track); // nullptr = off
   void ApplyPlayerPrefs();
@@ -217,17 +222,19 @@ private:
   std::string SleepLabel() const;
   void UpdateSleepTimer();
 
-  // The playback menu (Options while watching) and the resume question:
-  // a side blade, or a small dialog in the middle of the screen.
+  // Menus are a blade on the right (Options) or a dialog in the middle (a
+  // question to answer first).
+  void ShowMenu(const std::string& title, std::vector<MenuItem> items, bool dialog,
+		const std::string& meta = {}, const std::string& progress = "0%");
   void OpenWatchMenu();
   void OpenResumeDialog(const HtspDvrEntry& entry);
-  // The Options button on the guide or the recordings (PS4 style): what can
-  // be done with what is selected. Over a video playing behind the menus,
-  // the playback menu instead.
+  // Play, or Resume and Play from beginning.
+  std::vector<MenuItem> PlayItems(const HtspDvrEntry& entry);
+  // Options in the guide or the recordings: what can be done with what is
+  // selected; over a video behind the menus, the playback menu.
   void OpenOptionsMenu();
-  // A menu of plain actions (no settings), titled for what it is about.
   void OpenContextMenu(const std::string& title, std::vector<MenuItem> items);
-  // "Delete X?": the action, and Cancel. 'detail' says what it means.
+  // "Delete X?": the action, and Cancel; 'detail' says what it means.
   void OpenConfirm(const std::string& question, const std::string& detail,
 		   const std::string& action, std::function<void()> run);
   void CloseMenu();
@@ -237,7 +244,7 @@ private:
   void HandleKeyMain(Rml::Event& event, int key);
   void HandleKeyWatch(Rml::Event& event, int key);
 
-  // Data model bound state (main thread only).
+  // Bound to the data model.
   Rml::DataModelHandle model_;
   Rml::String bind_view_ = "connect";
   Rml::String bind_section_ = "channels";
@@ -256,11 +263,11 @@ private:
   Rml::String bind_detail_title_;
   Rml::String bind_detail_meta_;
   Rml::String bind_detail_desc_;
-  Rml::String bind_detail_rec_;   // "Recording scheduled" banner
+  Rml::String bind_detail_rec_;   // "Recording scheduled"
   Rml::String bind_player_status_;
   bool bind_watching_ = false;     // something plays (full screen or behind)
   bool bind_fullscreen_ = false;   // ... full screen, the menus hidden
-  bool bind_info_visible_ = false; // watch info bar shown (auto-hides)
+  bool bind_info_visible_ = false; // the info bar (hides by itself)
   Rml::String bind_watch_name_;
   Rml::String bind_watch_now_;
   Rml::String bind_watch_time_;
@@ -269,16 +276,15 @@ private:
   bool bind_watch_paused_ = false;
   Rml::String bind_watch_ends_;    // "Ends at 21:40"
   Rml::String bind_watch_seek_;    // seek bubble: "» +2:30"
-  Rml::String bind_watch_seek_at_ = "0%"; // where it rides on the bar
+  Rml::String bind_watch_seek_at_ = "0%"; // where it sits on the bar
   Rml::String bind_watch_vtrack_;  // "1080p · H.264"
   Rml::String bind_watch_atrack_;  // "Swedish · Dolby Digital · 5.1"
   Rml::String bind_watch_strack_;  // subtitles shown, "" when off
   Rml::String bind_watch_speed_;   // "1.5×", "" at normal speed
   Rml::String bind_watch_sleep_;   // "Sleep 25 min", "" when off
 
-  // Menu bindings.
   bool bind_menu_open_ = false;
-  bool bind_menu_dialog_ = false;  // centered dialog rather than side blade
+  bool bind_menu_dialog_ = false;  // a dialog rather than the blade
   Rml::String bind_menu_title_;
   Rml::String bind_menu_meta_;
   Rml::String bind_menu_progress_ = "0%"; // data-style-width; "0%" = no bar
@@ -286,7 +292,6 @@ private:
   std::vector<MenuItem> menu_items_;
   int sel_menu_ = 0;
 
-  // Connect screen bindings.
   std::vector<ServerRow> server_rows_;
   int sel_server_ = 0;
   int server_count_ = 0;
@@ -296,7 +301,6 @@ private:
   Rml::String cfg_user_;
   Rml::String cfg_pass_;
 
-  // Main screen bindings.
   std::vector<ChannelRow> channel_rows_;
   std::vector<EpgRow> epg_rows_;
   std::vector<RecRow> rec_rows_;
@@ -305,9 +309,8 @@ private:
   int sel_rec_ = 0;
   int channel_count_ = 0;
   int rec_count_ = 0;
-  bool connecting_ = false;
 
-  // Backing data (main thread copies of client state).
+  // Copies of the client's state behind the rows.
   std::vector<HtspChannel> channels_;
   std::vector<HtspEvent> epg_events_;
   std::vector<HtspDvrEntry> recordings_;
@@ -329,35 +332,39 @@ private:
   uint32_t playing_channel_id_ = 0;
   uint32_t playing_dvr_id_ = 0;
 
-  // Connect worker.
+  // Connecting runs on a thread of its own; connect_error_ is the worker's
+  // until the state leaves Busy.
   enum class ConnectState { Idle, Busy, Success, Failed };
   std::thread connect_thread_;
   std::atomic<ConnectState> connect_state_{ConnectState::Idle};
-  std::string connect_error_; // only touched by worker until state != Busy
-  int connecting_index_ = -1; // profile being connected to
+  std::string connect_error_;
+  int connecting_index_ = -1;
+  int auto_index_ = -1;             // the server connected to by itself
+  double auto_at_ = 0.0;            // when its next try starts
+  int auto_tries_ = 0;
+  uint32_t resume_channel_id_ = 0;  // live TV to tune back to, once connected
 
   uint64_t seen_generation_ = 0;
   double last_refresh_time_ = 0.0;
   double toast_deadline_ = 0.0;
-  double info_deadline_ = 0.0; // watch info bar auto-hide
+  double info_deadline_ = 0.0; // when the info bar hides
   bool scroll_channels_pending_ = false;
   bool scroll_epg_pending_ = false;
   bool scroll_rec_pending_ = false;
   bool scroll_server_pending_ = false;
   bool scroll_menu_pending_ = false;
 
-  // Seek run: how far the presses so far have jumped, how many there were,
-  // and until when the next one still belongs to the run.
+  // A run of seeks: how far it has gone, in how many steps, and until when
+  // the next press still belongs to it.
   int64_t seek_accum_us_ = 0;
   int seek_run_ = 0;
   double seek_bubble_until_ = 0.0;
 
-  // Resume: when the position was last sent, and what was sent.
+  // When the position was last sent, and what (-2: counted as watched).
   double position_saved_at_ = 0.0;
   int64_t position_saved_s_ = -1;
-  int64_t start_position_s_ = 0; // where the recording was started
 
-  // Sleep timer: when playback stops (Now() seconds), 0 = off; and whether
+  // Sleep timer: when playback stops (Now() seconds, 0 = off), and whether
   // that is the end of the programme on air.
   double sleep_at_ = 0.0;
   bool sleep_end_of_programme_ = false;

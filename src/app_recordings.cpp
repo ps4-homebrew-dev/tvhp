@@ -1,8 +1,7 @@
-// Recordings view: the DVR list and detail, plus the scheduling, cancelling
-// and deleting actions that act on the highlighted entry.
+// The recordings: their rows and details, and recording, cancelling,
+// deleting and playing them.
 #include <algorithm>
 #include <cstdio>
-#include <sstream>
 
 #include "app.h"
 #include "app_internal.h"
@@ -17,7 +16,7 @@ void App::RebuildRecordingRows()
   recordings_ = client_.GetDvrEntries();
   rec_count_ = (int)recordings_.size();
 
-  // Keep the same recording selected across rebuilds if possible.
+  // The same recording stays selected.
   if (selected_dvr_id_)
     {
       for (size_t i = 0; i < recordings_.size(); ++i)
@@ -37,24 +36,16 @@ void App::RebuildRecordingRows()
       RecRow row;
       row.title = e.title.empty() ? "Untitled recording" : e.title;
 
-      std::ostringstream meta;
       if (!e.channel_name.empty())
-	meta << e.channel_name << "  ·  ";
-      meta << FmtDay(e.start) << " " << FmtHM(e.start);
-      if (e.season || e.episode)
-	{
-	  meta << "  ·  ";
-	  if (e.season)
-	    meta << "S" << e.season;
-	  if (e.episode)
-	    meta << "E" << e.episode;
-	}
-      row.meta = meta.str();
+	row.meta = e.channel_name + "  ·  ";
+      row.meta += FmtDay(e.start) + " " + FmtHM(e.start);
+      const std::string episode = FmtEpisode(e.season, e.episode);
+      if (!episode.empty())
+	row.meta += "  ·  " + episode;
       row.state = DvrStateLabel(e);
       row.pending = e.IsPending();
       row.failed = !e.error.empty() || e.state == "missed" || e.state == "invalid";
-      // Where it was left, of its scheduled length; and whether it has
-      // been watched to the end (the server keeps both).
+      // How far it was watched, of its scheduled length.
       const int64_t length = e.stop - e.start;
       row.resumable = e.HasFile() && e.play_position >= kMinResumeSec && length > 0;
       if (row.resumable)
@@ -102,21 +93,14 @@ void App::RebuildRecordingDetail()
       selected_dvr_id_ = e->id;
       bind_detail_title_ = e->title.empty() ? "Untitled recording" : e->title;
 
-      std::ostringstream meta;
       if (!e->channel_name.empty())
-	meta << e->channel_name << "  ·  ";
-      meta << FmtDay(e->start) << "  ·  " << FmtRange(e->start, e->stop)
-	   << "  ·  " << FmtDuration(e->start, e->stop);
+	bind_detail_meta_ = e->channel_name + "  ·  ";
+      bind_detail_meta_ += FmtDay(e->start) + "  ·  " + FmtRange(e->start, e->stop) + "  ·  " +
+			   FmtDuration(e->start, e->stop);
       if (e->data_size > 0)
-	meta << "  ·  " << (e->data_size / (1024 * 1024)) << " MB";
-      bind_detail_meta_ = meta.str();
+	bind_detail_meta_ += "  ·  " + std::to_string(e->data_size / (1024 * 1024)) + " MB";
 
-      if (!e->subtitle.empty() && e->subtitle != e->title)
-	bind_detail_desc_ = e->subtitle + "\n";
-      if (!e->description.empty())
-	bind_detail_desc_ += e->description;
-      else if (!e->summary.empty())
-	bind_detail_desc_ += e->summary;
+      bind_detail_desc_ = Synopsis(e->title, e->subtitle, e->description, e->summary);
       if (bind_detail_desc_.empty())
 	bind_detail_desc_ = "No description available.";
 
@@ -149,7 +133,7 @@ void App::ToggleRecordSelectedEvent()
     }
   if (have && entry.IsFinished())
     {
-      ShowToast("Already recorded - see Recordings", icon::kFilm);
+      ShowToast("Already recorded: see Recordings", icon::kFilm);
       return;
     }
 
@@ -162,14 +146,12 @@ void App::ToggleRecordSelectedEvent()
 
   const std::string title = ev.title.empty() ? std::string("programme") : ev.title;
   ShowToast("Recording scheduled: " + title, icon::kScheduled);
-  // The dvrEntryAdd push will refresh the list, but update the badge now so
-  // the press feels immediate.
+  // The server's dvrEntryAdd follows; the badge shows at once.
   RefreshFromClient(true);
 }
 
-// destructive == true means deleteDvrEntry (removes the file); false means
-// cancelDvrEntry (unschedules or stops, keeping whatever was recorded).
-// Either is asked about first, in a dialog, as the PS4 does.
+// Deleting removes the file; cancelling unschedules or stops a recording
+// and keeps what was recorded. Both ask first.
 void App::CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive)
 {
   const uint32_t id = entry.id;
@@ -201,7 +183,6 @@ void App::CancelOrDeleteRecording(const HtspDvrEntry& entry, bool destructive)
 	  ShowToast(error.empty() ? "The server refused the request" : error, icon::kWarning);
 	  return;
 	}
-      // If the entry just removed is the one playing, stop first.
       if (playing_dvr_id_ == id)
 	StopPlayback();
       ShowToast(destructive ? "Recording deleted" : "Recording cancelled",
@@ -233,7 +214,7 @@ void App::PlaySelectedRecording()
       return;
     }
 
-  // Left part-way, here or on another client: ask whether to go on.
+  // Left part-way, here or on another client: resume?
   if (client_.SupportsPlayPosition() && e->play_position >= kMinResumeSec)
     {
       OpenResumeDialog(*e);
@@ -242,8 +223,6 @@ void App::PlaySelectedRecording()
   StartRecording(e->id, 0);
 }
 
-// Triangle in the recordings list: cancels an upcoming or running recording,
-// deletes a finished one. Both need a second press to confirm.
 void App::RemoveSelectedRecording()
 {
   const HtspDvrEntry* e = SelectedRecording();

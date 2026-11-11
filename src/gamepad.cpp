@@ -69,7 +69,7 @@ KeyIdentifier ButtonKey(Uint8 button) {
 }
 
 bool Repeats(KeyIdentifier key) {
-  // L1 / R1 too: they zap while watching. (Outside the enum: not a case.)
+  // L1 / R1 zap while watching. (Not in the enum, so not a case.)
   if ((int)key == keymap::KI_TAB_PREV || (int)key == keymap::KI_TAB_NEXT)
     return true;
   switch (key) {

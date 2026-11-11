@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// One blocking HTTP client on top of libcurl: https, redirects, content
-// encodings and CA-bundle discovery, in one place. From jtplay; tvhp uses
-// it for the channel logos a server gives as URLs (see IconCache), and adds
-// a login for the ones on the server's own web port.
-//
-// Not thread safe: one instance belongs to one thread, or to whoever holds
-// the mutex that guards it. Requests block, so callers are worker threads.
+// A blocking HTTP client on libcurl (https, redirects, encodings), from
+// jtplay, for the logos a server gives as URLs (see IconCache). One
+// instance per thread; requests block, so the callers are workers.
 #ifndef NET_HTTP_CLIENT_H
 #define NET_HTTP_CLIENT_H
 

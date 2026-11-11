@@ -1,7 +1,6 @@
 /*
- * Watch mode: the video is drawn beneath the RmlUi layer. Full screen, the
- * menus hide so it shows through, with jtplay's OSD along the bottom; back
- * from full screen, it plays on behind the menus under a shade.
+ * Watching: the video is under the UI. Full screen, the menus hide and the
+ * info bar comes and goes; else the video plays on behind the menus.
  */
 
 /* ------------------------------------------------------------------ */
@@ -17,10 +16,8 @@ body.watching #main-view {
 	display: none;
 }
 
-/* A video playing on behind the menus (back from full screen): the menus'
- * background gives way to the picture, under a shade dark enough for the
- * lists, lighter at the top right where the clock is, so the picture shows
- * as more than a tint. */
+/* Behind the menus: a shade dark enough for the lists, lighter by the
+ * clock, so the picture shows as more than a tint. */
 body.behind {
 	background-color: #0b102000;
 	decorator: none;
@@ -100,8 +97,8 @@ body.watching #toast {
 	border-radius: 12px;
 }
 
-/* How far a run of seeks has jumped, over the playhead. 240px wide: the
- * app keeps its middle 120px from either end (UpdateWatchOverlay). */
+/* How far a run of seeks has gone, over the playhead. 240px wide, as
+ * UpdateWatchOverlay() knows. */
 .osd-seek {
 	position: absolute;
 	bottom: 26px;
@@ -183,9 +180,7 @@ body.watching #toast {
 	text-overflow: ellipsis;
 }
 
-/* The two lines under the title have fixed heights: they are there,
- * empty, before the stream's tracks are known, so the bar keeps its size
- * when they come. */
+/* Fixed heights: the bar keeps its size while these are empty. */
 .osd-desc {
 	flex-shrink: 0;
 	height: 31px;

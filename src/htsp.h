@@ -21,14 +21,12 @@ struct HtspChannel {
   uint32_t id = 0;
   uint32_t number = 0;
   std::string name;
-  uint32_t event_id = 0;      // current EPG event, 0 = unknown
-  // The channel's logo as the server names it: "imagecache/123" (fetched
-  // with FileOpen, see IconCache), an http URL when the server's image
-  // cache is off, or "" when it has none.
+  // The logo as the server names it: "imagecache/123", an http(s) URL (the
+  // image cache off), "picon://..." or "" (see IconCache).
   std::string icon;
 };
 
-// One EPG event, as pushed by eventAdd/eventUpdate. Times are unix seconds.
+// An EPG event (eventAdd/eventUpdate). Times are unix seconds.
 struct HtspEvent {
   uint32_t id = 0;
   uint32_t channel_id = 0;
@@ -42,8 +40,8 @@ struct HtspEvent {
   uint32_t episode = 0; // 0 = not set
 };
 
-// One DVR entry (a scheduled, running or finished recording), as pushed by
-// dvrEntryAdd/dvrEntryUpdate. Times are unix seconds.
+// A scheduled, running or finished recording (dvrEntryAdd/dvrEntryUpdate).
+// Times are unix seconds.
 struct HtspDvrEntry {
   uint32_t id = 0;
   uint32_t channel_id = 0;
@@ -61,24 +59,21 @@ struct HtspDvrEntry {
   uint32_t season = 0;
   uint32_t episode = 0;
   bool enabled = true;
-  // Where playback was left, in seconds (0 = from the start), and how often
-  // it has been watched to the end. Kept by the server (HTSP 27+), so a
-  // recording resumes where it was left on any client, Kodi included.
+  // Where playback was left (seconds, 0 = the start) and how often it was
+  // watched to the end; the server keeps both (HTSP 27+), for every client.
   uint32_t play_position = 0;
   uint32_t play_count = 0;
 
   bool IsScheduled() const { return state == "scheduled"; }
   bool IsRecording() const { return state == "recording"; }
   bool IsFinished() const { return state == "completed"; }
-  // Whether a file exists that can be streamed with the HTSP file API. An
-  // in-progress recording can be played too - the server keeps serving the
-  // growing file, which is the main reason for preferring fileOpen over HTTP.
+  // There is a file to play; a running recording's grows as it plays.
   bool HasFile() const { return IsFinished() || IsRecording(); }
-  // Upcoming or in progress, i.e. cancelling it is meaningful.
+  // Upcoming or running: it can be cancelled.
   bool IsPending() const { return IsScheduled() || IsRecording(); }
 };
 
-// One elementary stream announced in subscriptionStart.
+// An elementary stream of a subscriptionStart.
 struct HtspStreamInfo {
   uint32_t index = 0;
   std::string type; // "H264", "HEVC", "MPEG2VIDEO", "AC3", "AAC", ...
@@ -87,14 +82,12 @@ struct HtspStreamInfo {
   std::string language;             // ISO 639-2, "" when not given
   // DVB subtitles: the pages of the service's subtitles.
   uint32_t composition_id = 0, ancillary_id = 0;
-  // The codec's global header ("meta"), when the server sends one: the
-  // AudioSpecificConfig of an AAC stream whose packets carry no ADTS
-  // header (DVB-T2's LATM is delivered like this), the avcC of an H.264
-  // stream, ... Empty when the packets are self-describing.
+  // The codec's global header ("meta") when the server sends one, such as an
+  // AAC AudioSpecificConfig for packets without ADTS headers.
   std::vector<uint8_t> extradata;
 };
 
-// One demuxed packet (muxpkt). Timestamps are in microseconds.
+// A packet (muxpkt). Timestamps are microseconds.
 struct HtspMuxPacket {
   uint32_t stream = 0;
   int64_t pts = INT64_MIN; // INT64_MIN = unknown
@@ -104,10 +97,7 @@ struct HtspMuxPacket {
   std::vector<uint8_t> payload;
 };
 
-// HTSP (Home Tv Streaming Protocol) client built on libhts (htsmsg binary
-// serialization, as used by Kodi's pvr.hts addon).
-//
-// Protocol flow:
+// An HTSP client, on libhts (as Kodi's pvr.hts):
 //   hello                -> server capabilities + 32-byte auth challenge
 //   authenticate         -> digest = SHA1(password + challenge)
 //   enableAsyncMetadata  -> server pushes channelAdd/eventAdd/dvrEntryAdd/...
@@ -118,41 +108,32 @@ class HtspClient {
 public:
   ~HtspClient();
 
-  // Connects to the HTSP port (default 9982) and performs hello +
-  // authenticate. Blocking; returns false and fills 'error' on failure.
-  // Safe to call again after a failed connection or a Disconnect().
+  // Connects, says hello and authenticates. Blocks. Can be called again
+  // after a failure or a Disconnect().
   bool Connect(const std::string& host, int port, const std::string& user, const std::string& pass, std::string& error);
 
-  // Sends enableAsyncMetadata (channels + EPG + DVR entries) and starts the
-  // reader thread. on_sync is invoked (from the reader thread) once the
-  // initial sync completes; on_update is invoked on any later channel
-  // add/update/delete with the full refreshed list. Callbacks must be
-  // thread-safe, and both may be null: polling Generation() from the UI
-  // thread is the recommended way to observe channel/EPG/DVR changes.
-  void StartAsync(std::function<void(std::vector<HtspChannel>)> on_sync = {},
-		  std::function<void(std::vector<HtspChannel>)> on_update = {});
+  // Starts the reader thread and asks for channels, the EPG and the
+  // recordings, which then keep coming as they change.
+  void StartAsync();
 
-  // --- Thread-safe snapshots for the UI --------------------------------
-  // Monotonic counter bumped on every channel, EPG or DVR mutation (and on
-  // initial sync / disconnect). Poll it once per frame and refresh views
-  // when it changes.
+  // --- Snapshots, from any thread --------------------------------------
+  // Bumped on every change of channels, events or recordings, and on the
+  // initial sync and a disconnect.
   uint64_t Generation() const { return generation.load(); }
 
-  // True once StartAsync() has run and the connection is still alive.
+  // StartAsync() has run and the connection is alive.
   bool Connected() const { return running.load(); }
 
-  // True once the server has finished the initial channel/EPG dump.
+  // The server has sent everything it had at the start.
   bool SyncCompleted() const;
 
   // Channels sorted by number, then name.
   std::vector<HtspChannel> GetChannels() const;
 
-  // Upcoming (and currently airing) events for a channel, sorted by start
-  // time. max_events = 0 means no limit.
+  // A channel's events from the one on now, by start; 0 = no limit.
   std::vector<HtspEvent> GetChannelEvents(uint32_t channel_id, size_t max_events = 0) const;
 
-  // Fills the currently airing event for a channel. 'now' is left untouched
-  // when has_now is false.
+  // What a channel has on now.
   struct NowNext {
     bool has_now = false;
     HtspEvent now;
@@ -160,94 +141,80 @@ public:
   NowNext GetNowNext(uint32_t channel_id) const;
 
   // --- DVR (recordings) --------------------------------------------------
-  // All known DVR entries, sorted with pending recordings first (soonest
-  // first) and finished ones after them (most recent first).
+  // Pending recordings first (soonest first), then the rest (newest
+  // first).
   std::vector<HtspDvrEntry> GetDvrEntries() const;
 
-  // Looks up the recording scheduled for an EPG event. Returns false when
-  // the event is not being recorded.
+  // The recording of an EPG event, if any.
   bool GetDvrEntryForEvent(uint32_t event_id, HtspDvrEntry* out) const;
   bool GetDvrEntry(uint32_t dvr_id, HtspDvrEntry* out) const;
 
-  // Schedules a recording for an EPG event (addDvrEntry). On success the new
-  // entry id is stored in *out_id when out_id is non-null. The entry itself
-  // arrives asynchronously as a dvrEntryAdd.
-  bool RecordEvent(uint32_t event_id, std::string& error, uint32_t* out_id = nullptr);
+  // Schedules a recording; its entry follows as a dvrEntryAdd.
+  bool RecordEvent(uint32_t event_id, std::string& error);
 
-  // cancelDvrEntry keeps the entry (and any partial file) but stops or
-  // unschedules it; deleteDvrEntry removes the entry and its file.
-  // Saves where playback of a recording was left (seconds; 0 = from the
-  // start) and, with 'watched', counts it as watched to the end. Does not
-  // wait for the reply, so it never holds up the UI; the server confirms
-  // with a dvrEntryUpdate. The local copy changes at once. Nothing is sent
-  // to a server older than HTSP 27, which keeps no position.
+  // Where playback was left (0 = the start) and, with 'watched', one more
+  // viewing to the end. The local copy changes at once; the request is not
+  // waited for. Not for servers before HTSP 27, which keep no position.
   void SavePlayPosition(uint32_t dvr_id, uint32_t seconds, bool watched);
-  // Marks a recording watched (counted once, from the start next time) or
-  // unwatched (never played). Like SavePlayPosition, does not wait.
+  // Watched (once, from the start next time) or never played. Not waited
+  // for either.
   void SetWatched(uint32_t dvr_id, bool watched);
 
+  // Cancelling stops or unschedules a recording and keeps what was
+  // recorded; deleting removes it and its file.
   bool CancelDvrEntry(uint32_t dvr_id, std::string& error);
   bool DeleteDvrEntry(uint32_t dvr_id, std::string& error);
 
-  // --- Live streaming (subscribe / muxpkt) --------------------------------
-  // Callbacks fire on the reader thread and must not block for long.
+  // --- Live TV -------------------------------------------------------------
+  // On the reader thread; not to block.
   struct StreamCallbacks {
     std::function<void(std::vector<HtspStreamInfo>)> on_start;
     std::function<void(HtspMuxPacket&&)> on_packet;
-    std::function<void(std::string)> on_status; // subscriptionStatus ("" = all well again) / stop reason
-    std::function<void()> on_stop;              // subscriptionStop, after on_status
+    std::function<void(std::string)> on_status; // a problem, "" when over, or why it stopped
+    std::function<void()> on_stop;              // after on_status
   };
   void SetStreamCallbacks(StreamCallbacks cbs);
 
-  // Subscribes to a channel (replacing any active subscription).
+  // Replaces any subscription.
   bool Subscribe(uint32_t channel_id, std::string& error);
   void Unsubscribe();
 
-  // --- File access (recording playback) -----------------------------------
-  // Server-side file handles, used to stream recordings over the same
-  // connection. Requires HTSP v8+. Paths are "/dvrfile/<id>" for recordings
-  // and "/imagecache/<id>" for cached artwork.
-  //
-  // Safe to call from a decoder thread while the UI thread issues other
-  // requests.
+  // --- Files (HTSP 8+) -----------------------------------------------------
+  // "/dvrfile/<id>" for recordings, "imagecache/<id>" for logos. From any
+  // thread.
   bool FileOpen(const std::string& path, uint32_t* handle, int64_t* size, std::string& error);
-  // Reads up to 'size' bytes. offset < 0 reads from the server-side current
-  // position. Returns the number of bytes read (may be less than requested,
-  // 0 at end of file) or -1 on error.
+  // Up to 'size' bytes at 'offset' (< 0: where the last read ended): the
+  // count, 0 at the end, -1 on error.
   int64_t FileRead(uint32_t handle, void* buf, int64_t size, int64_t offset, std::string& error);
   bool FileStat(uint32_t handle, int64_t* size, std::string& error);
   void FileClose(uint32_t handle);
 
   void Disconnect();
 
-  // Recording playback needs fileOpen, which arrived in HTSP v8.
   bool SupportsFileApi() const { return htsp_version >= 8; }
   bool SupportsPlayPosition() const { return htsp_version >= 27; }
 
 private:
-  // Sends a request and waits for the seq-matched reply (reader thread
-  // dispatches it). Takes ownership of 'msg'. Returns nullptr on timeout /
-  // disconnect; caller owns the returned message.
+  // These take 'msg'. SendRequest waits for the reply (nullptr on a timeout
+  // or a lost connection), which the caller then owns.
   htsmsg_t* SendRequest(htsmsg_t* msg, int timeout_ms, std::string& error);
 
-  // Sends a request whose reply only carries success/error (and optionally
-  // the id of a created object). Takes ownership of 'msg'.
-  bool SimpleRequest(htsmsg_t* msg, std::string& error, uint32_t* out_id = nullptr);
-
-  // Synchronous send/receive used during the handshake, before the reader
-  // thread exists.
-  bool SendMessage(htsmsg_t* msg, std::string& error); // takes ownership
+  // A request answered with success or an error only.
+  bool SimpleRequest(htsmsg_t* msg, std::string& error);
+  // Without waiting for the reply.
+  void SendNoReply(htsmsg_t* msg);
+  bool SendMessage(htsmsg_t* msg, std::string& error);
+  // The handshake's, before the reader thread runs.
   htsmsg_t* ReadMessage(int timeout_ms, std::string& error);
 
   void ReaderLoop();
-  void HandleAsyncMessage(htsmsg_t* msg); // does not take ownership
+  void HandleAsyncMessage(htsmsg_t* msg); // does not take 'msg'
 
-  // EPG helpers; caller must hold channels_mutex.
+  // With channels_mutex held.
   void UpsertEventLocked(htsmsg_t* msg, bool is_update);
   void RemoveEventLocked(uint32_t event_id);
   void PruneExpiredLocked(time_t now);
 
-  // DVR helpers; caller must hold channels_mutex.
   void UpsertDvrEntryLocked(htsmsg_t* msg);
   void RemoveDvrEntryLocked(uint32_t dvr_id);
 
@@ -257,7 +224,7 @@ private:
   std::thread reader;
   std::atomic<bool> running{false};
 
-  // seq -> slot for the pending reply
+  // Requests waiting for their reply, by seq.
   struct Pending {
     htsmsg_t* reply = nullptr;
     bool done = false;
@@ -267,11 +234,11 @@ private:
   std::map<uint32_t, Pending*> pending;
   uint32_t next_seq = 1;
 
-  // Guards channels, EPG/DVR storage and initial_sync_done.
+  // Guards what follows, up to initial_sync_done.
   mutable std::mutex channels_mutex;
-  std::map<uint32_t, HtspChannel> channels; // keyed by channelId
-  // EPG: per-channel events keyed by start time, plus a global index for
-  // eventUpdate/eventDelete which only carry the eventId.
+  std::map<uint32_t, HtspChannel> channels; // by channelId
+  // Events by channel and start, and where each is (eventUpdate and
+  // eventDelete carry only the eventId).
   std::map<uint32_t, std::map<int64_t, HtspEvent>> epg; // channelId -> start -> event
   struct EventLocator { uint32_t channel_id = 0; int64_t start = 0; };
   std::map<uint32_t, EventLocator> event_index; // eventId -> locator
@@ -279,8 +246,6 @@ private:
   std::map<uint32_t, uint32_t> dvr_by_event;    // eventId -> dvrId
   time_t last_prune = 0;
   bool initial_sync_done = false;
-  std::function<void(std::vector<HtspChannel>)> sync_cb;
-  std::function<void(std::vector<HtspChannel>)> update_cb;
 
   std::atomic<uint64_t> generation{0};
 

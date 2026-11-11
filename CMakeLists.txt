@@ -36,9 +36,8 @@ add_executable(tvhp
 )
 
 target_compile_options(tvhp PRIVATE -Wall -Werror)
-# Antialiasing of the UI's edges (rounded corners, curves): the renderer's
-# default of 2 samples leaves them visibly stepped. Clamped to what the
-# driver supports (RmlUi_Renderer_GL3.cpp). As in jtplay.
+# 2 samples (the default) leave rounded corners stepped; the renderer
+# clamps this to what the driver supports.
 target_compile_definitions(tvhp PRIVATE RMLUI_NUM_MSAA_SAMPLES=4)
 target_include_directories(tvhp PRIVATE src)
 
@@ -71,16 +70,12 @@ if(ORBIS)
     pkg_check_modules(GL REQUIRED gl)
     pkg_check_modules(VULKAN REQUIRED vulkan)
 
-    # A non-game application ("gdc"), as jtplay is: a PS5 running it as a
-    # PS4 app treats it as a media app, and only that gets the remote's media
-    # keys there. A non-game has no /temp0 (temporary data, games only), so
-    # it asks for download data instead, mounted at /download0, where
-    # SDL2main (pacbrew 0.8.7 and later) puts the XDG base directories: the
-    # saved servers and settings, the channel icons, Mesa's shader cache.
-    # Its size is in MiB. The content ID is the one earlier versions got by
-    # default, so a new package installs over an old one.
-    # The certificates https needs (channel logos on web servers), as jtplay
-    # ships them: libcurl is told where with SSL_CERT_FILE (src/main.cpp).
+    # A non-game app ("gdc"): a PS5 gives only media apps the remote's media
+    # keys. Non-games have no /temp0, so this asks for download data
+    # (MiB), /download0, where SDL2main (pacbrew 0.8.7+) puts the XDG
+    # directories: the settings, the logos, Mesa's shader cache. The content
+    # ID is the one earlier versions got, so a new package installs over an
+    # old one. ca-bundle.crt is for https (SSL_CERT_FILE, src/main.cpp).
     file(COPY ${CMAKE_SYSROOT}/usr/etc/ca-bundle.crt DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
 
     orbis_add_pkg(tvhp

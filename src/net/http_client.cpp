@@ -151,8 +151,7 @@ namespace net {
     // The worker thread must not be hit by libcurl's signal-based timeouts.
     ::curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
 
-    // Neither a plugin nor an <img src> has any business opening file:// or
-    // scp:// URLs.
+    // A logo has no business on file:// or scp://.
 #if LIBCURL_VERSION_NUM >= 0x075500
     ::curl_easy_setopt(curl_, CURLOPT_PROTOCOLS_STR, "http,https");
     ::curl_easy_setopt(curl_, CURLOPT_REDIR_PROTOCOLS_STR, "http,https");
@@ -163,8 +162,7 @@ namespace net {
 		       (long)(CURLPROTO_HTTP | CURLPROTO_HTTPS));
 #endif
 
-    // Builds without a baked-in CA bundle (the PS5 toolchain among them)
-    // need to be told where the certificates live.
+    // Without a built-in CA bundle (the PS4's), where the certificates are.
     for (const char* name : {"SSL_CERT_FILE", "CURL_CA_BUNDLE"}) {
       if (const char* path = ::getenv(name)) {
 	if (*path) {

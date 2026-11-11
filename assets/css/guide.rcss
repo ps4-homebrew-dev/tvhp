@@ -1,12 +1,10 @@
 /*
  * Channel list and programme guide rows.
  *
- * Row heights and margins here are mirrored by the pitch constants in
- * src/app_internal.h, which keyboard scrolling uses; change both together.
+ * Row heights + margins are the pitches in src/app_internal.h.
  *
- * Focus is jtplay's: in the pane that has it, the selected row is a solid
- * accent bar with dark text. The other pane keeps its selection as a
- * lighter row, so it is clear which channel the guide is for.
+ * In the pane with the focus, the selection is the accent bar; the other
+ * pane's is a lighter row, so it is clear which channel the guide is for.
  */
 
 /* ------------------------------------------------------------------ */

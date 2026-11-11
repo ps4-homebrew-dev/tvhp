@@ -11,16 +11,12 @@
 		<link type="text/rcss" href="css/watch.rcss"/>
 		<link type="text/rcss" href="css/menu.rcss"/>
 	</head>
-	<!-- Icons are glyphs of the Lucide font (src/icons.h), written here as
-	     character references: &#xE195; tv, &#xE0D4; film, &#xE140; play,
-	     &#xE132; pause, &#xE349; record, &#xE304; scheduled, &#xE157;
-	     server, &#xE073; chevron, &#xE226; done, &#xE48A; now playing. -->
+	<!-- Icons are Lucide's characters (src/icons.h). -->
 	<body data-model="tv" data-class-watching="watching && fullscreen"
 	      data-class-behind="watching && !fullscreen"
 	      data-class-blade="menu_open && !menu_dialog">
 
-		<!-- A video playing on behind the menus (Back from full screen):
-		     the shade the menus need over it to be read. -->
+		<!-- Over a video behind the menus, so they can be read. -->
 		<div id="video-shade" data-if="watching && !fullscreen"/>
 
 		<!-- ============================ Connect ============================ -->
@@ -48,8 +44,7 @@
 						</div>
 						<div class="srvgo">&#xE073;</div>
 					</div>
-					<!-- After the servers: adding one, so a first run needs no
-					     instructions. -->
+					<!-- After the servers: adding one. -->
 					<div class="server-row add-row" data-class-selected="sel_server == server_count"
 					     data-event-click="select_server(server_count)">
 						<div class="srvicon">&#xE141;</div>
@@ -65,7 +60,7 @@
 
 		</div>
 
-		<!-- Modal add/edit dialog, opened with the Options button -->
+		<!-- Adding or editing a server -->
 		<div id="server-dialog" data-if="dialog != ''">
 			<div class="dialog-card">
 				<div class="dialog-title">{{dialog_title}}</div>
@@ -104,8 +99,7 @@
 		<div id="main-view" data-if="view == 'main'">
 
 			<div id="topbar">
-				<!-- The two places, as tabs: Up from the top of a list onto
-				     them, Left / Right to pick (or L1 / R1 from anywhere). -->
+				<!-- Up from the top of a list, then Left / Right; or L1 / R1. -->
 				<div id="tabs" data-class-focused="zone == 'tabs'">
 					<div class="tab" data-class-selected="section == 'channels'"
 					     data-event-click="select_section('channels')">
@@ -138,8 +132,7 @@
 						     data-class-selected="it_index == sel_channel"
 						     data-class-playing="ch.playing"
 						     data-event-click="select_channel(it_index)">
-							<!-- The logo (Tvheadend's); while there is none, the
-							     channel's number, or a TV for a channel without one. -->
+							<!-- The logo, else the number, else a TV. -->
 							<div class="chlogo" data-if="ch.icon != 'none'"><div class="logo-img" data-style-decorator="ch.icon"/></div>
 							<div class="chlogo number" data-if="ch.icon == 'none' && ch.number != ''">{{ch.number}}</div>
 							<div class="chlogo empty" data-if="ch.icon == 'none' && ch.number == ''">&#xE195;</div>
@@ -155,7 +148,7 @@
 					</div>
 				</div>
 
-				<!-- Programme guide for the selected channel -->
+				<!-- The selected channel's programmes -->
 				<div id="epg" class="pane" data-if="section == 'channels'"
 				     data-class-active="zone == 'epg'">
 					<div class="pane-head">
@@ -164,10 +157,7 @@
 						<span class="count">{{epg_channel}}</span>
 					</div>
 					<div id="epg-list" class="list">
-						<!-- NOTE: don't rename the iterator to "ev":
-						     addresses starting with "ev." are reserved by
-						     RmlUi for event parameters and silently bypass
-						     data-for aliases. -->
+						<!-- Not "ev": RmlUi keeps "ev." for event parameters. -->
 						<div class="epg-row" data-for="prog : epg"
 						     data-class-selected="it_index == sel_epg && zone == 'epg'"
 						     data-class-now="prog.now"
@@ -209,7 +199,6 @@
 							<div class="recinfo">
 								<div class="rectitle">{{rec.title}}<span class="chlive" data-if="rec.playing">&#xE48A;</span></div>
 								<div class="recmeta"><span class="recwatched" data-if="rec.watched">&#xE070; WATCHED</span>{{rec.meta}}</div>
-								<!-- Left part-way: how far (Tvheadend keeps it). -->
 								<div class="recprogress" data-if="rec.resumable">
 									<div class="bar" data-style-width="rec.progress"/>
 								</div>
@@ -219,7 +208,7 @@
 					</div>
 				</div>
 
-				<!-- Details for the selected recording -->
+				<!-- The selected recording -->
 				<div id="recdetail" class="pane" data-if="section == 'recordings'">
 					<div class="pane-head">
 						<span class="eyebrow">DETAILS</span>
@@ -238,14 +227,14 @@
 
 		</div>
 
-		<!-- ========================= Playback OSD ========================== -->
+		<!-- ============================ Watching =========================== -->
 
-		<!-- A paused recording: a large badge in the middle, Kodi style. -->
+		<!-- A paused recording, Kodi style. -->
 		<div id="pause-badge" data-if="watching && fullscreen && watch_paused && !menu_open">&#xE132;</div>
 
-		<!-- The bar along the bottom. Its top edge is the timeline: the
-		     programme on air for live TV, the position in a recording, with a
-		     knob at the playhead and, while seeking, how far in all. -->
+		<!-- The info bar. Its top edge is the timeline: the programme on air,
+		     or the recording's position with a knob and, while seeking, how
+		     far. -->
 		<div id="osd" data-if="watching && fullscreen && info_visible">
 			<div class="osd-edge">
 				<div class="osd-played" data-style-width="watch_progress"/>
@@ -262,11 +251,8 @@
 				<div class="osd-glyph" data-if="watch_recorded && !watch_paused">&#xE140;</div>
 				<div class="osd-main">
 					<div class="osd-title">{{watch_name}}</div>
-					<!-- Both lines below keep their room while empty (no guide
-					     data; the tracks not known yet), so the bar never
-					     changes height. -->
+					<!-- Fixed heights, empty or not: the bar keeps its size. -->
 					<div class="osd-desc">{{watch_now}}</div>
-					<!-- What is being decoded, and the settings that are on. -->
 					<div class="osd-tracks">
 						<span class="osd-track" data-if="watch_vtrack != ''">{{watch_vtrack}}</span>
 						<span class="osd-track" data-if="watch_atrack != ''">{{watch_atrack}}</span>
@@ -285,10 +271,8 @@
 			</div>
 		</div>
 
-		<!-- The playback menu (Options while watching): a blade on the left.
-		     Or, with menu_dialog, a question in the middle of the screen
-		     (resume a recording?). Left/right change a setting, cross runs
-		     an action, circle closes. -->
+		<!-- Menus: a blade on the right, or (menu_dialog) a question in the
+		     middle. Left/right change a setting, cross acts, circle closes. -->
 		<div id="menu-scrim" data-if="menu_open" data-class-dialog="menu_dialog"/>
 		<div id="menu" data-if="menu_open" data-class-dialog="menu_dialog">
 			<div class="menu-title">{{menu_title}}</div>
@@ -305,7 +289,6 @@
 			</div>
 		</div>
 
-		<!-- Toast -->
 		<div id="toast" data-if="toast != ''">
 			<span class="toast-icon" data-if="toast_icon != ''">{{toast_icon}}</span>
 			<span class="toast-text">{{toast}}</span>

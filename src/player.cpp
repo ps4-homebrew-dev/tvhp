@@ -23,20 +23,16 @@ namespace {
 constexpr const char* kLiveProtocol = "tvhp-live";
 constexpr const char* kDvrProtocol = "tvhp-dvr";
 
-// The largest single HTSP fileRead. Big enough to keep the request rate low
-// on a 1080i transport stream, small enough that a seek doesn't stall.
+// The largest fileRead: few requests, yet quick seeks.
 constexpr uint64_t kMaxFileRead = 256 * 1024;
 
-// How often the end of a recording that is still running is looked at
-// again for new data.
+// How often the end of a running recording is looked at again.
 constexpr auto kGrowPoll = std::chrono::milliseconds(500);
 
-// A reported duration that moves by more than this once playback has started
-// is an estimate, not the length of the file (see Player::DurationReliable).
+// A duration that moves more than this while playing is an estimate.
 constexpr int64_t kDurationDriftUs = 2 * 1000000;
 
-// Statuses that only say something is on its way; mpv opening the stream
-// is the end of them.
+// Until mpv has the stream open.
 constexpr const char* kTuning = "Tuning...";
 constexpr const char* kOpening = "Opening recording...";
 
@@ -101,8 +97,7 @@ bool PropertyFlag(const mpv_event_property* prop) {
          *static_cast<const int*>(prop->data);
 }
 
-// What a track's codec is called on a box or a menu rather than inside
-// FFmpeg: "H.264", "Dolby Digital". Unknown ones as they are, upper-cased.
+// A codec as a box names it: "H.264", "Dolby Digital"; else upper-cased.
 std::string CodecName(const std::string& codec) {
   static const struct { const char* ffmpeg; const char* name; } kNames[] = {
     {"h264", "H.264"}, {"hevc", "HEVC"}, {"av1", "AV1"}, {"vp9", "VP9"},
@@ -123,7 +118,7 @@ std::string CodecName(const std::string& codec) {
   return upper;
 }
 
-// A picture's size as it is sold: "4K", "1080p", "720p", "SD".
+// "4K", "1080p", "720p", "SD".
 std::string ResolutionName(int64_t width, int64_t height) {
   if (width <= 0 || height <= 0)
     return {};
@@ -134,7 +129,7 @@ std::string ResolutionName(int64_t width, int64_t height) {
   return "SD";
 }
 
-// mpv's channel layout as a menu says it: "Mono", "Stereo", "5.1".
+// "Mono", "Stereo", "5.1".
 std::string ChannelsName(const std::string& layout) {
   if (layout.empty())
     return {};
@@ -145,8 +140,7 @@ std::string ChannelsName(const std::string& layout) {
   return paren == std::string::npos ? layout : layout.substr(0, paren);
 }
 
-// The ISO 639-2 codes broadcasters tag their streams with, as a person
-// reads them. Unknown codes stay as they are.
+// ISO 639-2 codes as names; unknown ones as they are.
 std::string LanguageName(const std::string& code) {
   static const struct { const char* code; const char* name; } kNames[] = {
     {"eng", "English"}, {"swe", "Swedish"}, {"nor", "Norwegian"}, {"nob", "Norwegian"},
@@ -227,8 +221,7 @@ int64_t DvrRead(void* cookie, char* buf, uint64_t size) {
       f->pos += got;
       return got;
     }
-    // The end of the file - for now, if it is still being recorded: wait
-    // for more rather than end playback at what has been written so far.
+    // The end, for now, of a recording still running: wait for more.
     HtspDvrEntry entry;
     if (!f->client->Connected() || !f->client->GetDvrEntry(f->dvr_id, &entry) ||
         !entry.IsRecording())
@@ -288,13 +281,11 @@ bool Player::Initialize(std::string& error, const std::string& fonts_dir) {
     return false;
   }
 
-  // The window is the app's; mpv draws through the render API and takes no
-  // input. 'quiet' options are left out silently by an mpv that doesn't know
-  // them (the built-in Lua scripts differ between versions; none is wanted).
+  // mpv draws through the render API and takes no input. A 'quiet' option
+  // may be unknown to an mpv (its scripts differ by version) without a word.
   struct Option { const char* name; const char* value; bool quiet; };
   static const Option options[] = {
-    // Bilinear scaling, no dithering, no LUT-based scalers: what the PS4's
-    // GPU affords at 1080p next to the UI.
+    // What the PS4's GPU affords at 1080p beside the UI.
     {"profile", "fast", false},
     {"vo", "libmpv", false},
     {"idle", "yes", false},
@@ -317,9 +308,8 @@ bool Player::Initialize(std::string& error, const std::string& fonts_dir) {
     {"osd-level", "0", false},
     {"hwdec", "no", false},
     {"audio-display", "no", false},
-    // Subtitles are picked by language (SetPreferredLanguages); with no
-    // preferred language they start off, as before. A language picked by
-    // hand means subtitles on, even where the sound is in it too.
+    // A subtitle language picked by hand means subtitles on, even where the
+    // sound is in that language too.
     {"subs-with-matching-audio", "yes", true},
     {"cache-pause", "yes", false},
     {"cache-pause-initial", "yes", false},
@@ -335,9 +325,7 @@ bool Player::Initialize(std::string& error, const std::string& fonts_dir) {
                    mpv_error_string(rc));
   }
 
-  // Subtitles in the UI's typeface, from the app's own font directory, so
-  // text subtitles render with and without a system font setup. (DVB
-  // subtitles are pictures and need none.)
+  // Text subtitles in the UI's typeface (DVB subtitles are pictures).
   if (!fonts_dir.empty()) {
     mpv_set_option_string(mpv_, "sub-fonts-dir", fonts_dir.c_str());
     mpv_set_option_string(mpv_, "osd-fonts-dir", fonts_dir.c_str());
@@ -345,8 +333,7 @@ bool Player::Initialize(std::string& error, const std::string& fonts_dir) {
     mpv_set_option_string(mpv_, "sub-bold", "yes");
   }
 
-  // Extra mpv options for testing and tuning, as "name=value" words:
-  //   TVHP_MPV="hwdec=auto-safe alang=eng" ./tvhp
+  // More options, for testing: TVHP_MPV="hwdec=auto-safe alang=eng".
   if (const char* extra = std::getenv("TVHP_MPV")) {
     std::string words = extra;
     size_t at = 0;
@@ -391,7 +378,7 @@ bool Player::Initialize(std::string& error, const std::string& fonts_dir) {
     return false;
   }
 
-  // mpv's messages go to stderr; TVHP_MPV_LOG=v (or debug) says more.
+  // To stderr; TVHP_MPV_LOG=v (or debug) for more.
   const char* log_level = std::getenv("TVHP_MPV_LOG");
   mpv_request_log_messages(mpv_, log_level && *log_level ? log_level : "warn");
   mpv_observe_property(mpv_, kPropTimePos, "time-pos", MPV_FORMAT_DOUBLE);
@@ -464,8 +451,7 @@ void Player::ResetPerStream(int64_t start_seconds) {
   speed_ = 1.0;
   mpv_set_property_string(mpv_, "sub-delay", "0");
   sub_delay_ = 0.0;
-  // "start" applies to every file loaded after it is set, so it is set (or
-  // reset) for each one.
+  // "start" applies to every file after it, so it is set for each.
   const std::string start = start_seconds > 0 ? std::to_string(start_seconds) : "none";
   mpv_set_property_string(mpv_, "start", start.c_str());
 }
@@ -474,8 +460,7 @@ void Player::LoadFile(const std::string& url, const char* options) {
   // A file that played to its end was left paused there (keep-open).
   mpv_set_property_string(mpv_, "pause", "no");
   // loadfile <url> <flags> [<index>] <options>; the index came with mpv
-  // 0.38 (client API 2.3). mpv_command_async() is safe from any thread, the
-  // HTSP reader's included.
+  // 0.38. Safe from any thread.
 #if MPV_CLIENT_API_VERSION >= MPV_MAKE_VERSION(2, 3)
   const char* cmd[] = {"loadfile", url.c_str(), "replace", "-1", options, nullptr};
   if (!options)
@@ -500,14 +485,12 @@ bool Player::PlayChannel(HtspClient& client, uint32_t channel_id, std::string& e
 
   const uint64_t session = ++session_;
 
-  // Callbacks fire on the HTSP reader thread.
   HtspClient::StreamCallbacks cbs;
   cbs.on_start = [this, session](std::vector<HtspStreamInfo> streams) {
     if (session != session_)
       return;
-    // Every start gets a transport stream of its own, and mpv a new file:
-    // when the server restarts the stream (the programme's streams
-    // changed), the muxer is set up for the new ones from scratch.
+    // Every start (the server restarts the stream when the programme's
+    // streams change) gets a transport stream, and mpv a file, of its own.
     auto mux = std::make_shared<TsMux>();
     const std::string desc = mux->Start(streams);
     uint64_t serial;
@@ -524,8 +507,7 @@ bool Player::PlayChannel(HtspClient& client, uint32_t channel_id, std::string& e
       serial = ++live_serial_;
     }
     std::fprintf(stderr, "live: %s\n", desc.c_str());
-    // The stream is a transport stream; telling the demuxer so spares it
-    // probing a source that only delivers in real time.
+    // Spares the demuxer probing a source that comes in real time.
     LoadFile(std::string(kLiveProtocol) + "://" + std::to_string(serial),
              "demuxer-lavf-format=mpegts");
   };
@@ -543,8 +525,7 @@ bool Player::PlayChannel(HtspClient& client, uint32_t channel_id, std::string& e
   cbs.on_status = [this, session](std::string status) {
     if (session != session_)
       return;
-    // All well again: "Tuning..." stays until the picture comes, a problem
-    // that has gone away goes.
+    // All well again: a problem goes, "Tuning..." stays for the picture.
     if (status.empty() && StatusText() == kTuning)
       return;
     SetStatus(status);
@@ -579,7 +560,7 @@ int Player::OpenLive(void* user_data, char* uri, mpv_stream_cb_info* info) {
     return MPV_ERROR_LOADING_FAILED;
 
   std::lock_guard<std::mutex> lock(self->live_mutex_);
-  // A file mpv was asked for before the stream restarted is gone.
+  // One asked for before the stream restarted is gone.
   if (!self->live_ || serial != self->live_serial_)
     return MPV_ERROR_LOADING_FAILED;
   info->cookie = new LiveCookie{self->live_};
@@ -654,7 +635,7 @@ void Player::Stop(HtspClient& client) {
   active_ = false;
   source_ = Source::None;
 
-  // The live stream ends first, so a demuxer blocked reading it lets go.
+  // First, so a demuxer blocked reading it lets go.
   {
     std::lock_guard<std::mutex> lock(live_mutex_);
     if (live_)
@@ -692,9 +673,8 @@ void Player::EventThread() {
 
     case MPV_EVENT_LOG_MESSAGE: {
       const auto* msg = static_cast<const mpv_event_log_message*>(event->data);
-      // A message repeated back to back is counted, not printed again: a
-      // flood of them (a broken stream, every packet) would otherwise keep
-      // this thread busy writing to a slow console while events pile up.
+      // Repeats are counted, not printed: a broken stream's flood would keep
+      // this thread writing to a slow console while events pile up.
       if (log_repeat_text_ == msg->text) {
         log_repeats_++;
       } else {
@@ -721,7 +701,6 @@ void Player::EventThread() {
 
     case MPV_EVENT_FILE_LOADED: {
       loaded_ = true;
-      // The picture is on its way: what was only a promise of it goes.
       const std::string status = StatusText();
       if (status == kTuning || status == kOpening)
         SetStatus({});
@@ -733,7 +712,7 @@ void Player::EventThread() {
       if (end->reason == MPV_END_FILE_REASON_ERROR && active_) {
         std::string why = last_error.empty() ? mpv_error_string(end->error) : last_error;
         std::fprintf(stderr, "mpv: playback failed: %s\n", why.c_str());
-        // A recording that could not be opened has said why already.
+        // One that could not be opened has said why.
         if (StatusText().rfind("Unable to open", 0) != 0)
           SetStatus("Playback failed: " + why);
       }
@@ -747,9 +726,6 @@ void Player::EventThread() {
         position_us_ = PropertyUs(prop);
         break;
       case kPropDuration: {
-        // A real duration is fixed once playback has started. One that keeps
-        // moving (a recording still being written) is not something to
-        // compare the position against.
         const int64_t now = PropertyUs(prop);
         const int64_t before = duration_us_.load();
         if (now >= 0 && before >= 0 && position_us_.load() >= 0 &&
@@ -800,11 +776,8 @@ void Player::EventThread() {
   }
 }
 
-// The tracks from mpv's track-list, with labels built from the metadata
-// (language, title, the accessibility flags DVB carries) plus the codec
-// and, depending on the kind, the channel layout or the picture size:
-// "Swedish · Dolby Digital · 5.1", "English · Audio description · AAC ·
-// Stereo", "1080p · H.264", "Finnish · Hard of hearing · DVB".
+// Labels like "Swedish · Dolby Digital · 5.1", "English · Audio description
+// · AAC · Stereo", "1080p · H.264", "Finnish · Hard of hearing · DVB".
 void Player::UpdateTracks(const mpv_node* list) {
   std::vector<TrackInfo> video, audio, subs;
 
@@ -816,7 +789,6 @@ void Player::UpdateTracks(const mpv_node* list) {
       const bool is_sub = type == "sub";
       if (!is_video && !is_sub && type != "audio")
         continue;
-      // Cover art is a video track in name only.
       if (is_video && NodeFlag(MapGet(track, "albumart")))
         continue;
 
@@ -830,7 +802,7 @@ void Player::UpdateTracks(const mpv_node* list) {
         lang.clear();
       append(LanguageName(lang));
       append(NodeString(MapGet(track, "title")));
-      // mpv 0.37 and later; older ones say nothing, and nothing is added.
+      // mpv 0.37 and later.
       if (NodeFlag(MapGet(track, "visual-impaired")))
         append("Audio description");
       if (NodeFlag(MapGet(track, "hearing-impaired")))
@@ -876,9 +848,8 @@ void Player::UpdateTracks(const mpv_node* list) {
 // ---------------------------------------------------------------------------
 
 void Player::RenderVideo(int width, int height) {
-  // Rendering starts with the loadfile, not after it: mpv hands the first
-  // frame over as the file opens, and gives up on a renderer that doesn't
-  // take it within 200 ms.
+  // From the loadfile on, not from when it has loaded: mpv gives up on a
+  // renderer that does not take the first frame within 200 ms.
   if (!render_ || !active_)
     return;
 
@@ -889,8 +860,7 @@ void Player::RenderVideo(int width, int height) {
   fbo.w = width;
   fbo.h = height;
   int flip_y = 1;
-  // The UI renders every frame anyway; mpv is not to hold it up waiting
-  // for the next video frame's time.
+  // The UI is not to wait for the next video frame's time.
   int block = 0;
   mpv_render_param params[] = {
     {MPV_RENDER_PARAM_OPENGL_FBO, &fbo},
@@ -905,7 +875,6 @@ void Player::SeekRelative(int64_t delta_us) {
   if (!active_ || !CanSeek())
     return;
 
-  // Seeking past the end would end the file; stop a second short instead.
   const int64_t pos = PositionUs();
   const int64_t dur = DurationUs();
   char amount[32];
@@ -923,8 +892,8 @@ void Player::SeekRelative(int64_t delta_us) {
 
 void Player::SetPaused(bool paused) {
   if (!mpv_ || source_ != Source::Recording)
-    return; // live TV doesn't wait for anyone
-  paused_ = paused; // at once, for the UI; the property event confirms it
+    return;
+  paused_ = paused; // at once, for the UI
   int flag = paused ? 1 : 0;
   mpv_set_property_async(mpv_, 0, "pause", MPV_FORMAT_FLAG, &flag);
 }
@@ -937,7 +906,7 @@ bool Player::TogglePause() {
 void Player::SetSpeed(double speed) {
   if (!mpv_ || !active_ || source_ != Source::Recording)
     return;
-  speed_ = speed; // at once, for the UI; the property event confirms it
+  speed_ = speed; // at once, for the UI
   mpv_set_property_async(mpv_, 0, "speed", MPV_FORMAT_DOUBLE, &speed);
 }
 
@@ -1016,7 +985,6 @@ void Player::SetFit(Fit fit) {
   fit_ = fit;
   if (!mpv_)
     return;
-  // Fill crops to the screen (panscan), Stretch ignores the aspect ratio.
   mpv_set_property_string(mpv_, "keepaspect", fit == Fit::Stretch ? "no" : "yes");
   SetDouble("panscan", fit == Fit::Fill ? 1.0 : 0.0);
 }

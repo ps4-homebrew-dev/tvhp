@@ -14,7 +14,7 @@ connection that carries the channel list and the guide.
 
 - **Live TV** — channel list with now/next and a progress bar, full programme
   guide per channel, full-screen playback with channel zapping.
-- **Scheduling** — record any programme from the guide with one button
+- **Scheduling** — record any programme from the guide with one button.
 - **Recordings** — browse everything the DVR holds, play it back, and cancel
   or delete entries.
 - **Playback of recordings over HTSP**, using the server's file API, including
@@ -31,8 +31,8 @@ connection that carries the channel list and the guide.
   "ends at" for recordings, and the tracks being played on the info bar.
 - **Video behind the menus**, as in Kodi — Back from full screen brings the
   guide or the recordings up over the picture, which plays on behind them.
-  Select it (or Options → Full screen) to go back to it; Back from the top
-  of the menus stops it.
+  Back again, or selecting what plays, returns to it. Back never stops
+  playback or disconnects; Stop and Options → Stop do.
 - **Channel logos** — Tvheadend's own, in the channel list, the guide, the
   recordings and the player, kept on the console after the first time. With
   the server's image cache on, they come over the HTSP connection (`fileOpen`);
@@ -40,7 +40,8 @@ connection that carries the channel list and the guide.
   are fetched over http(s), with the server's login when they are on its own
   host.
 - **Multiple servers** — save as many as you like and switch between them
-  without restarting.
+  without restarting. `tvhp` connects to the last one used by itself, and
+  when the connection drops it connects again, with the channel that was on.
 - Designed for a 1920x1080 screen at couch distance: large type, high
   contrast, and a single unmistakable focus colour. The look is jtplay's —
   rounded rows, an amber focus bar, soft shadows, glass dialogs, Lucide icons —
@@ -65,21 +66,21 @@ command is reachable from any of them; the pad mapping lives in
 | --- | --- | --- | --- |
 | Navigate | D-pad, left stick (held: repeats) | D-pad | Arrows |
 | Guide / Recordings tabs | Up from the top of a list, then Left / Right; or L1 / R1 | Up, then Left / Right | Up, then Left / Right |
-| While watching: zap, seek ±5 min | L1 / R1 | — | — |
+| While watching: previous / next channel, or 5 min back / on | L1 / R1 | — | — |
 | Page up / down | L2 / R2 | P+ / P- | Page Up / Page Down |
 | First / last row | — | — | Home / End |
 | Select: connect, watch, record, play; play/pause | Cross | Enter | Enter |
 | What can be done with it (menu) | Options (or hold Cross) | Menu (or hold OK) | Insert (or hold Enter) |
 | Back, cancel; from full screen: the menus, playing on | Circle | Back | Escape, Backspace |
-| Back to full screen | Cross on what plays, or Options → Full screen | Enter | Enter |
+| Back to full screen | Circle, or Cross on what plays | Back, Enter | Escape, Enter |
 | Guide ↔ recordings, info bar | Square | Display | Tab |
 | Delete recording or server (asks) | Triangle | Red | Delete |
 | Next audio track | — | Audio | F2 |
 | Jump to the guide | Back/select (not on a PS4) | Guide | F9 |
 | Play / pause | Cross | Play, Pause | Space |
-| Stop | Circle from the top of the menus, or Options → Stop | Stop | — |
+| Stop | Options → Stop | Stop | — |
 | Seek ±10 s, growing while pressed | Left / Right | Rewind, Fast forward | Left / Right |
-| Seek ±5 min | Up / Down, L1 / R1, L2 / R2 | Skip | Page Up / Page Down |
+| Seek ±5 min | Up / Down, L1 / R1, L2 / R2 | Skip, P+ / P- | Page Up / Page Down |
 
 The key identifiers follow what remote controls send, and the pad is mapped
 onto them rather than the other way round. That is why Circle is Escape rather
@@ -170,9 +171,7 @@ For the PS4, with the ps4-homebrew-dev SDK, the same CMakeLists.txt builds
 - Logos given as `picon://` (picons without a picon folder set on the server)
   cannot be fetched; those channels show their number instead. Set the picon path
   in Tvheadend (Configuration → General → Base) and they come as files.
-- Only programme-based recording is exposed. The client can also schedule a
-  manual time range (`HtspClient::RecordTimespan`), but nothing in the UI
-  calls it.
+- Only programme-based recording: no manual time ranges.
 - No series recording: `autorec` and `timerec` rules are neither listed nor
   editable.
 - No transcoding profile selection; the server's default is used.

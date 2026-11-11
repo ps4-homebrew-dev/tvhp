@@ -1,6 +1,5 @@
 /*
- * Connect screen: the saved-server list, the add/edit dialog, and the
- * form field and button styles they share.
+ * The connect screen: the servers, and the add/edit dialog.
  */
 
 /* ------------------------------------------------------------------ */
@@ -162,7 +161,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Add / edit server dialog (Options button)                          */
+/* Adding or editing a server                                         */
 /* ------------------------------------------------------------------ */
 
 /* Over the list, which shows through blurred. */

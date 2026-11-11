@@ -1,13 +1,13 @@
-// Application shell: owns the RmlUi document and data model, drives the
-// per-frame update, switches between views, and routes input. The views
-// themselves live in app_connect.cpp, app_guide.cpp, app_recordings.cpp and
-// app_watch.cpp.
+// The application shell: the data model, the per-frame update, switching
+// views, and routing keys. The views are in app_connect.cpp, app_guide.cpp,
+// app_recordings.cpp and app_watch.cpp.
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
 
 #include "app.h"
 #include "app_internal.h"
+#include "format.h"
 #include "icons.h"
 #include "keymap.h"
 
@@ -36,9 +36,8 @@ bool App::Initialize(Rml::Context* context, const Options& options, std::string&
   document_->Show();
   document_->AddEventListener(Rml::EventId::Keydown, this, true);
 
-  // The player draws with the window's GL context, current here. Without it
-  // the app still browses the guide and the recordings; playing says why it
-  // can't.
+  // The player needs the window's GL context, current here. Without a
+  // player the guide and the recordings still work.
   std::string player_error;
   if (player_->Initialize(player_error, options.fonts_dir))
     ApplyPlayerPrefs();
@@ -48,10 +47,12 @@ bool App::Initialize(Rml::Context* context, const Options& options, std::string&
   RebuildServerRows();
   LoadFormFromSelection();
 
-  SetConnectZone(Zone::ServerList);
-  // First run: there is nothing to select, so go straight to adding a server.
+  SetZone(Zone::ServerList);
+  // First run: straight to adding a server. Else to the last one used.
   if (config_.Empty())
     OpenServerDialog(true);
+  else
+    ScheduleReconnect(config_.LastUsed(), 0.0);
 
   return true;
 }
@@ -62,7 +63,7 @@ void App::Shutdown() {
 
   icons_.Stop();
   if (player_) {
-    // How far a recording got goes to the server while it is still there.
+    // While the server is still connected.
     SaveRecordingPosition();
     player_->Stop(client_);
     player_->Shutdown();
@@ -202,9 +203,10 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     if (args.empty())
       return;
     const int index = args[0].Get<int>();
-    SetConnectZone(Zone::ServerList);
+    SetZone(Zone::ServerList);
+    CancelReconnect();
     if (index == sel_server_) {
-      StartConnect(); // second click on the highlighted row connects
+      StartConnect(); // a second click connects
       return;
     }
     sel_server_ = index;
@@ -219,7 +221,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
     SetZone(Zone::Channels);
     if (index == sel_channel_)
       {
-	ActivateSelection(); // second click on the selected row = watch
+	ActivateSelection(); // a second click watches
 	return;
       }
     sel_channel_ = index;
@@ -262,12 +264,7 @@ bool App::SetupDataModel(Rml::Context* context, std::string& error) {
 }
 
 // ---------------------------------------------------------------------------
-// Connect screen: saved servers
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// View switching
+// Views
 // ---------------------------------------------------------------------------
 
 void App::SwitchToMain() {
@@ -285,9 +282,10 @@ void App::SwitchToMain() {
   RefreshFromClient(true);
 }
 
-// Drops the connection so a different server can be chosen. Safe to call
-// when already disconnected.
+// Safe to call when already disconnected.
 void App::DisconnectToLogin() {
+  CancelReconnect();
+  resume_channel_id_ = 0;
   StopPlayback();
   icons_.Stop();
   client_.Disconnect();
@@ -316,7 +314,7 @@ void App::SwitchToConnect(const std::string& status) {
   model_.DirtyVariable("status");
   RebuildServerRows();
   CloseServerDialog();
-  SetConnectZone(Zone::ServerList);
+  SetZone(Zone::ServerList);
 }
 
 void App::SetSection(Section section) {
@@ -343,7 +341,6 @@ void App::SetSection(Section section) {
 void App::Update() {
   PollConnectState();
 
-  // Clock (topbar).
   {
     const time_t now = time(nullptr);
     struct tm tm;
@@ -353,35 +350,44 @@ void App::Update() {
     if (bind_clock_ != buf) {
       bind_clock_ = buf;
       model_.DirtyVariable("clock");
-      char date[48] = {};
-      std::strftime(date, sizeof(date), "%A %e %B", &tm);
-      Rml::String text = date;
-      // "%e" pads a one-digit day with a space.
-      const size_t pad = text.find("  ");
-      if (pad != Rml::String::npos)
-	text.erase(pad, 1);
-      if (bind_date_ != text) {
-	bind_date_ = text;
-	model_.DirtyVariable("date");
-      }
+      Set(bind_date_, Rml::String(textfmt::FmtLongDate(now)), "date");
     }
   }
 
   if (view_ == View::Main) {
     if (!client_.Connected()) {
-      const ServerProfile* p = config_.At(config_.LastUsed());
-      SwitchToConnect("Connection to " + (p ? p->host : std::string("the server")) + " lost");
+      // Lost: back to the server list, connecting again by itself, and to
+      // the channel that was on.
+      const int index = connecting_index_;
+      const ServerProfile* p = config_.At(index);
+      if (player_ && player_->IsPlaying() && !player_->IsRecordingPlayback())
+	resume_channel_id_ = playing_channel_id_;
+      SwitchToConnect("Lost the connection to " + (p ? p->Label() : std::string("the server")));
+      ScheduleReconnect(index, kReconnectDelaysSec[0]);
       return;
     }
     RefreshFromClient(false);
     if (icons_.Generation() != seen_icons_)
       ApplyIcons();
+    // Back from a lost connection: the channel that was on, once known.
+    if (resume_channel_id_ && client_.SyncCompleted()) {
+      const uint32_t id = resume_channel_id_;
+      resume_channel_id_ = 0;
+      for (const HtspChannel& ch : channels_)
+	if (ch.id == id)
+	  PlayChannel(id);
+    }
+  } else if (auto_index_ >= 0 && connect_state_ == ConnectState::Idle && Now() >= auto_at_) {
+    sel_server_ = auto_index_;
+    scroll_server_pending_ = true;
+    model_.DirtyVariable("sel_server");
+    StartConnect();
   }
 
   if (bind_watching_ && player_)
     {
-      // A recording played to its end: counted as watched on the server,
-      // and back to the list.
+      // A recording played to its end: counted as watched, and back to the
+      // list.
       if (player_->AtEnd())
 	{
 	  HtspDvrEntry entry;
@@ -393,7 +399,7 @@ void App::Update() {
 		    icon::kDone);
 	  return;
 	}
-      // The position, now and then, in case the app does not get to stop.
+      // Now and then, in case the app is closed without stopping.
       if (playing_dvr_id_ && !player_->IsPaused() &&
 	  Now() - position_saved_at_ > kPositionSaveSec)
 	{
@@ -403,47 +409,34 @@ void App::Update() {
     }
   UpdateSleepTimer();
 
-  // Behind the menus, the info bar is kept current for the way back to
-  // full screen.
+  // Behind the menus, kept current for the way back to full screen.
   if (VideoBehind())
     UpdateWatchOverlay();
 
-  // Watch info bar: refresh while visible (cheap; only dirties on change),
-  // then auto-hide. The bar stays up while a recording is paused, and while
-  // the playback menu is open, so the transport and the tracks show.
+  // The info bar hides by itself, except over a paused recording or the
+  // playback menu.
   if (bind_watching_ && bind_fullscreen_ && bind_info_visible_)
     {
       UpdateWatchOverlay();
       if (Now() > info_deadline_ && !bind_menu_open_ && !(player_ && player_->IsPaused()))
-	{
-	  bind_info_visible_ = false;
-	  model_.DirtyVariable("info_visible");
-	}
+	HideWatchInfo();
     }
-  // The menu's values follow what changes under them (a track the stream
-  // announces late, the sleep timer counting down).
+  // Menu values follow what changes under them (tracks announced late, the
+  // sleep timer counting down).
   if (bind_menu_open_ && !bind_menu_dialog_)
     {
       for (size_t i = 0; i < menu_items_.size() && i < menu_rows_.size(); i++)
 	{
 	  const Rml::String value = menu_items_[i].value ? menu_items_[i].value() : "";
-	  if (menu_rows_[i].value != value)
-	    {
-	      menu_rows_[i].value = value;
-	      model_.DirtyVariable("menu");
-	    }
+	  Set(menu_rows_[i].value, value, "menu");
 	}
     }
 
-  // Toast expiry.
-  if (!bind_toast_.empty() && Now() > toast_deadline_)
-    {
-      bind_toast_.clear();
-      model_.DirtyVariable("toast");
-    }
+  if (Now() > toast_deadline_)
+    Set(bind_toast_, Rml::String(), "toast");
 
-  // Deferred scrolling; uses layout data from the previous frame, which is
-  // fine because row heights are fixed.
+  // Scrolling waits for the frame's update; it uses the previous layout,
+  // which is fine with fixed row heights.
   if (scroll_server_pending_)
     {
       EnsureRowVisible("server-list", sel_server_, kServerRowPitch);
@@ -498,23 +491,9 @@ void App::RefreshFromClient(bool force)
       RebuildRecordingDetail();
     }
 
-  const std::string player_status = player_ ? player_->StatusText() : std::string();
-  if (bind_player_status_ != player_status)
-    {
-      bind_player_status_ = player_status;
-      model_.DirtyVariable("player_status");
-    }
+  Set(bind_player_status_, player_ ? Rml::String(player_->StatusText()) : Rml::String(),
+      "player_status");
 }
-
-// ---------------------------------------------------------------------------
-// Model rebuilding: channels and guide
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// Model rebuilding: recordings
-// ---------------------------------------------------------------------------
-
 
 // ---------------------------------------------------------------------------
 // Navigation
@@ -589,8 +568,7 @@ void App::EnterTabs()
   SetZone(Zone::Tabs);
 }
 
-// Back into the section shown, where it was left when it is the one the
-// tabs were entered from.
+// Back into the section shown, where it was left if it is the same one.
 void App::LeaveTabs()
 {
   if (section_ == Section::Recordings)
@@ -706,16 +684,6 @@ void App::ActivateSelection()
 }
 
 
-// ---------------------------------------------------------------------------
-// Recording (DVR)
-// ---------------------------------------------------------------------------
-
-
-// ---------------------------------------------------------------------------
-// Watch mode (full-screen video)
-// ---------------------------------------------------------------------------
-
-
 void App::EnsureRowVisible(const char* list_id, int index, float row_pitch)
 {
   Rml::Element* list = document_ ? document_->GetElementById(list_id) : nullptr;
@@ -726,7 +694,7 @@ void App::EnsureRowVisible(const char* list_id, int index, float row_pitch)
   if (view_h <= 0.0f)
     return;
 
-  // Keep the selected row centered where possible.
+  // The selected row in the middle, where the list allows.
   float target = index * row_pitch - (view_h - row_pitch) * 0.5f;
   const float max_scroll = std::max(0.0f, list->GetScrollHeight() - view_h);
   target = std::clamp(target, 0.0f, max_scroll);
@@ -752,13 +720,6 @@ void App::ProcessEvent(Rml::Event& event)
     return;
 
   const int key = event.GetParameter<int>("key_identifier", 0);
-
-  if (key == Rml::Input::KI_F8)
-    {
-      event.StopPropagation();
-      return;
-    }
-
   if (bind_menu_open_)
     HandleKeyMenu(event, key);
   else if (view_ == View::Connect)
@@ -776,7 +737,7 @@ void App::HandleKeyMain(Rml::Event& event, int key)
       return;
     }
 
-  // Over a video playing behind the menus, a few keys are about it.
+  // Over a video behind the menus, a few keys are about it.
   if (VideoBehind())
     {
       switch (keymap::Command(key))
@@ -790,8 +751,7 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	  event.StopPropagation();
 	  return;
 	case keymap::Cmd::PlayPause:
-	  // A recording pauses and plays on, as from full screen; live TV
-	  // can't, and the key starts what is highlighted as ever.
+	  // A recording pauses; on live TV the key plays what is selected.
 	  if (player_->IsRecordingPlayback())
 	    {
 	      const bool paused = player_->TogglePause();
@@ -815,9 +775,6 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	}
     }
 
-  // On the tabs: Left / Right pick one, and it shows at once; Down or
-  // cross go back into it. Options, Back, Stop and Guide work as from the
-  // lists.
   if (zone_ == Zone::Tabs && HandleKeyTabs(keymap::Command(key)))
     {
       event.StopPropagation();
@@ -827,7 +784,7 @@ void App::HandleKeyMain(Rml::Event& event, int key)
   switch (keymap::Command(key))
     {
     // Up from the top of a list goes onto the tabs, as on the PS4's own
-    // screens: the one way there for a TV remote, which has no L1 / R1.
+    // screens; a TV remote has no L1 / R1.
     case keymap::Cmd::Up:
       if (AtTopOfList())
 	EnterTabs();
@@ -837,8 +794,6 @@ void App::HandleKeyMain(Rml::Event& event, int key)
     case keymap::Cmd::Down:
       MoveSelection(+1);
       break;
-    // L1 / R1: the tabs, Guide on the left, Recordings on the right, as on
-    // every PS4 screen with tabs.
     case keymap::Cmd::TabPrev:
       SetSection(Section::Channels);
       break;
@@ -870,13 +825,11 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	SetZone(Zone::Channels);
       break;
 
-    // Square switches between the guide and the recordings library.
     case keymap::Cmd::Secondary:
       SetSection(section_ == Section::Channels ? Section::Recordings : Section::Channels);
       break;
 
-    // The remote has a dedicated Guide button, which always means "show me
-    // the channels", and steps into the programme list if it is already there.
+    // The remote's Guide key: the channels, then into their programmes.
     case keymap::Cmd::Guide:
       if (section_ != Section::Channels)
 	SetSection(Section::Channels);
@@ -888,36 +841,30 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	}
       break;
 
-    // Options: what can be done with what is selected (PS4 style).
     case keymap::Cmd::Options:
       OpenOptionsMenu();
       break;
 
-    // Triangle removes the highlighted recording, after asking: a shortcut
-    // for the Options menu's Delete. It does nothing anywhere else.
+    // Triangle: Options > Delete, in the recordings only.
     case keymap::Cmd::Remove:
       if (section_ != Section::Recordings)
 	return;
       RemoveSelectedRecording();
       break;
 
+    // Back goes up a level, and back to a video behind the menus. It never
+    // stops playback or disconnects: Stop, and Options, do.
     case keymap::Cmd::Back:
-      // Back steps up one level, and from the top of either section it
-      // returns to the server list so another server can be picked.
       if (zone_ == Zone::Epg)
 	SetZone(Zone::Channels);
-      else if (player_ && player_->IsPlaying())
-	{
-	  StopPlayback();
-	  ShowToast("Playback stopped", icon::kStop);
-	}
+      else if (zone_ == Zone::Tabs)
+	LeaveTabs();
+      else if (VideoBehind())
+	SetFullscreen(true);
       else if (section_ == Section::Recordings)
 	SetSection(Section::Channels);
-      else
-	DisconnectToLogin();
       break;
 
-    // Stop only ever means stop; it never navigates.
     case keymap::Cmd::Stop:
       if (!player_ || !player_->IsPlaying())
 	return;
@@ -925,9 +872,8 @@ void App::HandleKeyMain(Rml::Event& event, int key)
       ShowToast("Playback stopped", icon::kStop);
       break;
 
-    // Play starts whatever is highlighted, but only where that is what the
-    // cross button would do: in the guide, cross schedules a recording, and
-    // the play button should not.
+    // Play plays what is selected; in the programmes, where cross records,
+    // it does nothing.
     case keymap::Cmd::PlayPause:
       if (zone_ == Zone::Epg)
 	return;
@@ -939,7 +885,7 @@ void App::HandleKeyMain(Rml::Event& event, int key)
       break;
 
     default:
-      return; // unhandled: let it propagate
+      return; // not ours: let it through
     }
   event.StopPropagation();
 }

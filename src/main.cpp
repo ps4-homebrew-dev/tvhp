@@ -6,8 +6,7 @@
 #include <string>
 #include <sys/stat.h>
 
-// Makes main() SDL_main() on a PS4, where SDL2main sets up the XDG
-// directories, hides the splash screen, and exits to the home screen.
+// On a PS4, SDL2main runs SDL_main(), having set up the XDG directories.
 #include <SDL.h>
 
 #include <RmlUi/Core.h>
@@ -17,7 +16,6 @@
 
 #define SCREEN_WIDTH  1920
 #define SCREEN_HEIGHT 1080
-
 
 static void PrintUsage(const char* argv0) {
   std::printf(
@@ -37,13 +35,11 @@ extern "C" int SDL_main(int argc, char* argv[]) {
 #if defined(__SCE__)
   options.assets_dir = "/app0/assets";
   options.fonts_dir = "/app0/fonts";
-  // libcurl's certificates, for channel logos on https (see CMakeLists.txt).
+  // libcurl's certificates, for logos on https.
   ::setenv("SSL_CERT_FILE", "/app0/ca-bundle.crt", 0);
 
-  // The saved servers go in the preference folder, which SDL2main puts in
-  // $XDG_DATA_HOME: on the title's download data, /download0, for this
-  // non-game app (see CMakeLists.txt), where they outlive the app and its
-  // updates.
+  // The preference folder is in $XDG_DATA_HOME, which SDL2main puts on the
+  // download data, /download0: it outlives the app and its updates.
   if (char* pref = SDL_GetPrefPath("", "tvhp")) {
     options.config_path = std::string(pref) + "tvhp.cfg";
     SDL_free(pref);
@@ -56,8 +52,7 @@ extern "C" int SDL_main(int argc, char* argv[]) {
   options.fonts_dir = cwd + "/fonts";
 #endif
 
-  // The channel icons: $XDG_CACHE_HOME/tvhp (on the PS4 also in
-  // /download0), or ~/.cache/tvhp.
+  // Logos: $XDG_CACHE_HOME/tvhp (on a PS4 in /download0), or ~/.cache/tvhp.
   if (const char* cache = std::getenv("XDG_CACHE_HOME"); cache && *cache)
     options.cache_dir = std::string(cache) + "/tvhp";
   else if (const char* home = std::getenv("HOME"); home && *home)
@@ -112,8 +107,7 @@ extern "C" int SDL_main(int argc, char* argv[]) {
   Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-BoldItalic.ttf", false);
   Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Italic.ttf", false);
   Rml::LoadFontFace(options.fonts_dir + "/LatoLatin-Regular.ttf", false);
-  // Fallbacks, for characters the text font lacks: the UI's icons (in the
-  // Private Use Area, see src/icons.h), then emoji in titles and names.
+  // Fallbacks: the icons (src/icons.h), then emoji in titles.
   Rml::LoadFontFace(options.fonts_dir + "/lucide.ttf", true);
   Rml::LoadFontFace(options.fonts_dir + "/NotoEmoji-VariableFont_wght.ttf", true);
 
@@ -128,8 +122,7 @@ extern "C" int SDL_main(int argc, char* argv[]) {
     app.Update();
     ctx->Update();
 
-    // The video goes straight to the backbuffer; the document, whose body
-    // is transparent while watching, is composited over it.
+    // The video goes to the backbuffer, the document over it.
     Backend::BeginFrame([&app](int width, int height) { app.RenderVideo(width, height); });
     ctx->Render();
     Backend::PresentFrame();

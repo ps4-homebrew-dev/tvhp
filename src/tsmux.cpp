@@ -15,30 +15,24 @@ extern "C" {
 
 namespace {
 
-// MPEG-TS packets are 188 bytes. The muxer writes them one at a time, so
-// with a buffer of whole packets every chunk handed on is whole packets
-// too, and dropping chunks never splits one.
+// A buffer of whole 188-byte packets: dropping chunks never splits one.
 constexpr int kTsPacket = 188;
 constexpr int kAvioBufferSize = kTsPacket * 64;
 
-// How much may wait for mpv. Live TV stays live: when mpv falls this far
-// behind, the oldest bytes go. (At broadcast bitrates this is many seconds;
-// it only fills when mpv stops reading.)
+// Live TV stays live: past this much waiting for mpv, the oldest goes.
 constexpr size_t kMaxBuffered = 32 * 1024 * 1024;
 
-// Where the rebased timestamps start, so the first packets' DTS (and audio
-// that slightly precedes the video) stay positive.
+// Where timestamps start, so the first ones stay positive.
 constexpr int64_t kStartUs = 1000000;
 
-// A timestamp this far from its stream's previous one is a discontinuity
-// (a source that restarted, a splice), not jitter: the timeline is re-based
-// so it carries on from where it was.
+// A jump this far is a discontinuity (a splice), not jitter: the timeline
+// carries on from where it was.
 constexpr int64_t kJumpUs = 5000000;
 constexpr int64_t kJumpStepUs = 40000;
 
 constexpr AVRational kMicroseconds = {1, 1000000};
 
-// HTSP stream type -> codec, for the codecs MPEG-TS can carry.
+// The codecs MPEG-TS carries.
 AVCodecID TsCodec(const std::string& type) {
   if (type == "H264") return AV_CODEC_ID_H264;
   if (type == "HEVC") return AV_CODEC_ID_HEVC;
@@ -49,9 +43,8 @@ AVCodecID TsCodec(const std::string& type) {
   if (type == "MPEG2AUDIO") return AV_CODEC_ID_MP2;
   if (type == "MP3") return AV_CODEC_ID_MP3;
   if (type == "OPUS") return AV_CODEC_ID_OPUS;
-  // Picture subtitles; Tvheadend hands them over as the decoder takes them
-  // (from the 0x0f sync byte, PES framing stripped), and the muxer frames
-  // them again. Teletext would need FFmpeg built with libzvbi to show.
+  // Without their PES framing, which the muxer adds again. (Teletext would
+  // need FFmpeg with libzvbi.)
   if (type == "DVBSUB") return AV_CODEC_ID_DVB_SUBTITLE;
   return AV_CODEC_ID_NONE;
 }
@@ -108,8 +101,7 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
       if (info.channels > 0)
         av_channel_layout_default(&par->ch_layout, (int)info.channels);
     } else if (codec == AV_CODEC_ID_DVB_SUBTITLE) {
-      // The pages the subtitles are on, for the stream's subtitling
-      // descriptor: the decoder shows those and no others.
+      // The pages, for the subtitling descriptor.
       par->extradata = static_cast<uint8_t*>(av_mallocz(4 + AV_INPUT_BUFFER_PADDING_SIZE));
       if (par->extradata) {
         par->extradata[0] = (uint8_t)(info.composition_id >> 8);
@@ -137,8 +129,7 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
       continue;
     }
 
-    // The description names the first video and the first audio stream,
-    // which are what mpv picks unless told otherwise.
+    // The first video and audio, which mpv picks.
     std::string& desc = video ? video_desc : audio_desc;
     if (desc.empty()) {
       desc = info.type;
@@ -168,12 +159,11 @@ std::string TsMux::Start(const std::vector<HtspStreamInfo>& streams) {
     return {};
   }
   fmt_->pb = avio_;
-  // Every packet goes out as soon as it is muxed; mpv is waiting for it.
   fmt_->flags |= AVFMT_FLAG_FLUSH_PACKETS;
   fmt_->max_delay = 0;
 
   AVDictionary* opts = nullptr;
-  // PAT/PMT often enough that the demuxer finds them fast after a restart.
+  // PAT/PMT often, for a quick start.
   av_dict_set(&opts, "mpegts_flags", "resend_headers", 0);
   av_dict_set(&opts, "service_name", "tvhp", 0);
   const int rc = avformat_write_header(fmt_, &opts);
@@ -206,10 +196,9 @@ void TsMux::Write(const HtspMuxPacket& in) {
   int64_t pts = in.pts;
   int64_t dts = in.dts != INT64_MIN ? in.dts : in.pts;
   if (dts == INT64_MIN)
-    return; // nothing to place it by; the demuxer couldn't either
+    return;
 
-  // Subtitles are sparse: a page may come minutes after the last one, and
-  // they don't say where the timeline is. Video and audio do.
+  // Subtitles are sparse: video and audio say where the timeline is.
   const bool sparse =
     fmt_->streams[index]->codecpar->codec_type == AVMEDIA_TYPE_SUBTITLE;
   if (base_us_ == INT64_MIN) {
@@ -230,7 +219,6 @@ void TsMux::Write(const HtspMuxPacket& in) {
   pts = pts != INT64_MIN ? pts - base_us_ + kStartUs : dts;
   if (dts < 0 || pts < dts)
     return;
-  // The muxer insists on increasing DTS per stream.
   if (last != INT64_MIN && dts <= last)
     return;
   last_dts_[index] = dts;
@@ -252,8 +240,7 @@ void TsMux::Write(const HtspMuxPacket& in) {
       avcodec_get_type(fmt_->streams[index]->codecpar->codec_id) != AVMEDIA_TYPE_VIDEO)
     pkt->flags |= AV_PKT_FLAG_KEY;
 
-  // Packets arrive interleaved already; av_write_frame() keeps them in that
-  // order instead of holding them back to interleave.
+  // Interleaved already: av_write_frame() does not hold them back.
   const int rc = av_write_frame(fmt_, pkt);
   if (rc < 0) {
     static bool warned = false;

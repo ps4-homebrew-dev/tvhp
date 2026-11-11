@@ -18,11 +18,9 @@
 
 namespace {
 
-// Logos are small; anything past this is not one.
+// Anything bigger is no logo.
 constexpr size_t kMaxIconBytes = 4 * 1024 * 1024;
-// The largest single fileRead.
 constexpr int64_t kChunk = 256 * 1024;
-// A failed icon is asked for again this much later, this many times.
 constexpr auto kRetryAfter = std::chrono::seconds(60);
 constexpr int kMaxAttempts = 3;
 
@@ -44,8 +42,7 @@ bool IsUrl(const std::string& icon) {
   return !icon.compare(0, 7, "http://") || !icon.compare(0, 8, "https://");
 }
 
-// The host of an http(s) URL, lower-cased: "tv.local" of
-// "http://user@TV.local:9981/x".
+// "tv.local" of "http://user@TV.local:9981/x".
 std::string UrlHost(const std::string& url) {
   size_t at = url.find("://");
   if (at == std::string::npos)
@@ -68,7 +65,7 @@ std::string UrlHost(const std::string& url) {
   return host;
 }
 
-// A file name for an URL: FNV-1a, the same from run to run.
+// FNV-1a: the same from run to run.
 std::string UrlName(const std::string& url) {
   uint64_t h = 1469598103934665603ULL;
   for (unsigned char c : url) {
@@ -85,7 +82,6 @@ std::string FileName(const std::string& icon) {
   return id ? std::to_string(id) : UrlName(icon);
 }
 
-// What the bytes are, by their first ones.
 const char* Extension(const std::string& d) {
   auto starts = [&](const char* magic, size_t at = 0) {
     return d.compare(at, std::strlen(magic), magic) == 0;
@@ -131,7 +127,7 @@ void IconCache::Start(HtspClient* client, const std::string& server, const std::
   if (root_.empty() || !client)
     return;
 
-  // The server's own folder: its image cache numbers are its own.
+  // Image cache numbers are the server's own.
   std::string name;
   for (char c : server)
     name += (std::isalnum((unsigned char)c) || c == '.' || c == '-') ? c : '_';
@@ -160,7 +156,7 @@ void IconCache::Stop() {
     thread_.join();
   std::lock_guard<std::mutex> lock(mutex_);
   client_ = nullptr;
-  // What was queued and never fetched may be asked for again.
+  // Never fetched: may be asked for again.
   for (auto it = entries_.begin(); it != entries_.end();)
     it = it->second.state == State::Queued ? entries_.erase(it) : std::next(it);
 }
@@ -175,7 +171,6 @@ std::string IconCache::Path(const std::string& icon) {
     Entry& e = it->second;
     if (e.state == State::Ready)
       return e.path;
-    // Failed: once more, when it is time and tries are left.
     if (e.state == State::Failed && e.attempts < kMaxAttempts && Clock::now() >= e.retry_at &&
         client_ && !stop_) {
       e.state = State::Queued;
@@ -185,7 +180,7 @@ std::string IconCache::Path(const std::string& icon) {
     return {};
   }
 
-  // Fetched by an earlier session? A few stats, once per icon.
+  // Fetched by an earlier run?
   Entry& e = entries_[icon];
   const std::string base = dir_ + "/" + FileName(icon) + ".";
   for (const char* ext : kExtensions) {
@@ -196,12 +191,11 @@ std::string IconCache::Path(const std::string& icon) {
     }
   }
   if (!client_ || stop_) {
-    entries_.erase(icon); // no worker: ask again later
+    entries_.erase(icon); // no worker: next time
     return {};
   }
   if (!ImageCacheId(icon) && !IsUrl(icon)) {
-    // "picon://..." (picons the server has no folder for), or something
-    // else entirely: nothing this app can fetch.
+    // "picon://..." (picons the server has no folder for): unfetchable.
     std::fprintf(stderr, "icons: %s: not an image cache file or a web address\n", icon.c_str());
     e.state = State::Failed;
     e.attempts = kMaxAttempts;
@@ -289,8 +283,6 @@ std::string IconCache::FetchUrl(const std::string& url, std::string& error) {
   req.stall_timeout_ms = 10000;
   req.deadline_ms = 30000;
   req.max_bytes = kMaxIconBytes;
-  // The server's own web port (its picons, say) wants its login; anyone
-  // else's server gets none.
   if (!host_.empty() && UrlHost(url) == host_) {
     req.user = user_;
     req.password = pass_;
@@ -311,7 +303,7 @@ std::string IconCache::Save(const std::string& name, const std::string& data, st
     error = "not an image this app can show";
     return {};
   }
-  // Written beside it and renamed, so a half-written file never shows.
+  // Written beside it and renamed: never half a file.
   const std::string path = dir_ + "/" + name + "." + ext;
   const std::string tmp = path + ".part";
   FILE* f = std::fopen(tmp.c_str(), "wb");

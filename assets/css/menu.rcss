@@ -1,17 +1,10 @@
 /*
- * The Options menu: a blade over the right edge, as on the PS4, with what
- * can be done with the selected item, or the playback settings while
- * watching (and over a video playing behind the menus); or
- * (#menu.dialog) a small dialog in the middle of the screen for a question
- * that needs an answer first (resume?). Left / right change a setting in
- * place, cross runs an action, circle closes.
- *
- * jtplay's, in tvhp's colours. Row height and margin are mirrored by
- * kMenuRowPitch in src/app_internal.h.
+ * Menus: a blade on the right, as the PS4's Options menu, or (.dialog) a
+ * question in the middle. Row height + margin is kMenuRowPitch.
  */
 
-/* Stacking, bottom to top: video shade 0, menus 1, pause badge 4, OSD 5,
- * menu 10, server dialog 15, toast 20. */
+/* Bottom to top: video shade, views 1, pause badge 4, info bar 5, menu
+ * scrim 9, menu 10, server dialog 15, toast 20. */
 #menu-scrim {
 	z-index: 9;
 	position: absolute;

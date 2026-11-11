@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Live TV for mpv. HTSP delivers a live channel as elementary-stream
-// packets (muxpkt), not as a container, while mpv plays byte streams. A
-// TsMux puts the packets back into an MPEG transport stream with
-// libavformat's muxer - the container they were broadcast in - and hands
-// the bytes to mpv through a stream callback (see Player).
+// Live TV for mpv: HTSP sends a channel's packets, mpv plays bytes. TsMux
+// puts the packets back into an MPEG transport stream with libavformat, for
+// mpv to read (see Player).
 //
 // Threads:
 //   HTSP reader  Start(), Write(), Finish()
@@ -30,29 +28,24 @@ class TsMux {
 public:
   ~TsMux();
 
-  // Sets the muxer up for the streams of a subscriptionStart and writes the
-  // stream header. Video, audio and DVB subtitle streams that MPEG-TS can
-  // carry are kept; teletext and anything else are left out. Returns a
-  // description like "H264 1280x720 + AC3 + DVB subtitles (swe)", empty
-  // when there is no video or audio to play.
+  // For a subscriptionStart's streams: video, audio and DVB subtitles (not
+  // teletext). Says what they are, "H264 1280x720 + AC3 + DVB subtitles
+  // (swe)", or "" when there is nothing to play.
   std::string Start(const std::vector<HtspStreamInfo>& streams);
 
-  // Muxes one packet. Packets of streams that were left out are dropped.
   void Write(const HtspMuxPacket& pkt);
 
   // The subscription is over: readers get what is buffered, then the end.
   void Finish();
 
-  // Blocks until there are bytes, the stream is over, or the read is
-  // cancelled. Returns the number of bytes copied, 0 at the end.
+  // Blocks until there are bytes (their count), or the end (0).
   int64_t Read(char* buf, uint64_t size);
-  // Wakes a blocked Read(), which then returns 0.
   void Cancel();
   // Finish() and Cancel() at once: nothing is read any more.
   void Close();
 
 private:
-  // libavformat's write callback (its buffer became const in FFmpeg 7).
+  // libavformat's write callback (const since FFmpeg 7).
   static int WritePacket(void* opaque, const uint8_t* buf, int size);
   static int WritePacketMutable(void* opaque, uint8_t* buf, int size);
   void Push(const uint8_t* buf, int size);
@@ -62,10 +55,9 @@ private:
   AVFormatContext* fmt_ = nullptr;
   AVIOContext* avio_ = nullptr;
   std::map<uint32_t, int> streams_; // HTSP stream index -> muxer stream
-  // HTSP timestamps are rebased so the transport stream starts near zero
-  // and doesn't wrap its 33-bit clock in the middle of a programme.
+  // Timestamps start near zero, so the 33-bit clock does not wrap.
   int64_t base_us_ = INT64_MIN;
-  std::vector<int64_t> last_dts_; // per muxer stream, to drop regressions
+  std::vector<int64_t> last_dts_; // per stream, to drop going back
 
   // --- bytes for mpv ------------------------------------------------------
   std::mutex mutex_;

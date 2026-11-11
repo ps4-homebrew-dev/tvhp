@@ -1,5 +1,5 @@
-// Connect view: the list of saved servers and the modal add/edit dialog,
-// including the connection worker thread and the form's focus handling.
+// The connect view: the saved servers, the add/edit dialog and its focus
+// handling, and connecting.
 #include <algorithm>
 #include <string>
 
@@ -13,13 +13,10 @@
 using namespace appdetail;
 
 namespace {
-  // Connect view form rows: label on the left, input on the right. The last
-  // row is the Save/Cancel button pair: Save sits in the label slot and
-  // Cancel in the input slot, so left/right moves between the two buttons.
-  // Up/down from a label or button walks the labels/buttons, so focus does
-  // not enter an <input> - and SDL does not start text input - unless the
-  // user presses right on a row. From inside an <input>, up/down goes to the
-  // next <input> instead, so a form can be filled in field after field.
+  // The dialog's rows: a label, then its field. The last row is Save (in the
+  // label's place) and Cancel (in the field's). Up/down walk the labels, so
+  // no text field takes the focus (and brings up the keyboard) until right
+  // is pressed; from a field, up/down go to the next field.
   struct FormRow { const char* label; const char* input; };
   constexpr FormRow kFormRows[] = {
     {"lbl-name", "in-name"},
@@ -45,7 +42,7 @@ void App::RebuildServerRows() {
   }
 
   server_count_ = (int)server_rows_.size();
-  // The row after the servers is "Add a server".
+  // sel_server_ == server_count_ is "Add a server".
   sel_server_ = std::clamp(sel_server_, 0, server_count_);
   model_.DirtyVariable("servers");
   model_.DirtyVariable("server_count");
@@ -84,9 +81,8 @@ ServerProfile App::FormToProfile() const {
   return p;
 }
 
-// Opens the modal add/edit dialog. Adding starts from a blank profile and
-// leaves sel_server_ past the end of the list, which is how SaveServer()
-// knows to append rather than overwrite.
+// Adding leaves sel_server_ past the end of the list, which is how
+// SaveServer() knows to append.
 void App::OpenServerDialog(bool add_new) {
   if (add_new)
     sel_server_ = (int)config_.Count();
@@ -96,8 +92,8 @@ void App::OpenServerDialog(bool add_new) {
   LoadFormFromSelection();
   bind_dialog_ = add_new ? "add" : "edit";
   bind_dialog_title_ = add_new ? "Add server" : "Edit server";
-  bind_status_.clear(); // don't carry a previous connection error into the dialog
-  SetConnectZone(Zone::ServerForm);
+  bind_status_.clear(); // not a connection error in the dialog
+  SetZone(Zone::ServerForm);
   model_.DirtyVariable("sel_server");
   model_.DirtyVariable("dialog");
   model_.DirtyVariable("dialog_title");
@@ -116,19 +112,16 @@ void App::CloseServerDialog() {
   model_.DirtyVariable("dialog");
   model_.DirtyVariable("dialog_title");
 
-  // Adding was abandoned: back on the row it was opened from.
+  // Adding abandoned: back on a row of the list.
   sel_server_ = std::clamp(sel_server_, 0, server_count_);
   model_.DirtyVariable("sel_server");
 
-  SetConnectZone(Zone::ServerList);
-  // Take focus off the text inputs so the on-screen keyboard closes.
+  SetZone(Zone::ServerList);
+  // Off the text fields, so the keyboard closes.
   if (document_)
     document_->Focus();
 }
 
-// Commits the edit fields into the profile list, adding a new entry when the
-// dialog was opened with Options rather than Square. Connecting is left to
-// the server list, so editing a server does not disturb the current session.
 void App::SaveServer() {
   const ServerProfile p = FormToProfile();
   if (!p.Valid()) {
@@ -142,8 +135,7 @@ void App::SaveServer() {
   else
     config_.Update(sel_server_, p);
 
-  // last_used_ is deliberately not touched here: it records the server that
-  // last connected successfully, which PollConnectState() sets.
+  // The last used server is the last one that connected, not this one.
   config_.Save(config_path_);
   RebuildServerRows();
   LoadFormFromSelection();
@@ -166,8 +158,7 @@ void App::DeleteSelectedServer() {
     });
 }
 
-// Options on a server: what can be done with it (PS4 style), or on the
-// "Add a server" row, straight to adding one.
+// Options on a server: what can be done with it; on "Add a server", adding.
 void App::OpenServerMenu() {
   const ServerProfile* p = config_.At(sel_server_);
   if (!p) {
@@ -182,8 +173,21 @@ void App::OpenServerMenu() {
   });
 }
 
-void App::SetConnectZone(Zone zone) {
-  zone_ = zone;
+void App::ScheduleReconnect(int index, double delay) {
+  if (!config_.At(index))
+    return;
+  auto_index_ = index;
+  auto_at_ = Now() + delay;
+}
+
+void App::CancelReconnect() {
+  if (auto_index_ < 0)
+    return;
+  auto_index_ = -1;
+  auto_tries_ = 0;
+  // Without "trying again".
+  if (connect_state_ != ConnectState::Busy && !connect_error_.empty())
+    Set(bind_status_, Rml::String(connect_error_), "status");
 }
 
 void App::StartConnect() {
@@ -199,8 +203,7 @@ void App::StartConnect() {
   if (connect_thread_.joinable())
     connect_thread_.join();
 
-  bind_status_ = "Connecting to " + p->host + "...";
-  connecting_ = true;
+  bind_status_ = "Connecting to " + p->Label() + "...";
   connecting_index_ = sel_server_;
   model_.DirtyVariable("status");
 
@@ -209,6 +212,7 @@ void App::StartConnect() {
   const std::string pass = p->pass;
   const int port = p->PortNumber();
 
+  connect_error_.clear();
   connect_state_ = ConnectState::Busy;
   connect_thread_ = std::thread([this, host, port, user, pass]() {
     std::string error;
@@ -218,7 +222,7 @@ void App::StartConnect() {
 	connect_state_ = ConnectState::Failed;
 	return;
       }
-    client_.StartAsync(); // UI observes progress via Generation()
+    client_.StartAsync();
     connect_state_ = ConnectState::Success;
   });
 }
@@ -232,29 +236,34 @@ void App::PollConnectState() {
     connect_thread_.join();
 
   connect_state_ = ConnectState::Idle;
-  connecting_ = false;
 
   if (state == ConnectState::Failed) {
     bind_status_ = connect_error_;
+    if (auto_index_ >= 0) {
+      constexpr int n = sizeof(kReconnectDelaysSec) / sizeof(kReconnectDelaysSec[0]);
+      const double delay = kReconnectDelaysSec[std::min(++auto_tries_, n - 1)];
+      ScheduleReconnect(auto_index_, delay);
+      bind_status_ += ". Trying again in " + std::to_string((int)delay) + " s";
+    }
     model_.DirtyVariable("status");
     return;
   }
+  auto_index_ = -1;
+  auto_tries_ = 0;
 
-  // Remember which server worked, so the next launch preselects it.
+  // The next launch starts with it.
   if (connecting_index_ >= 0) {
     config_.SetLastUsed(connecting_index_);
     config_.Save(config_path_);
   }
-  // The channel icons come over the new connection, into the server's
-  // own folder.
   if (const ServerProfile* p = config_.At(connecting_index_))
     icons_.Start(&client_, p->host + "_" + std::to_string(p->PortNumber()), p->host, p->user,
                  p->pass);
   SwitchToMain();
 }
 
-// Returns the row index of the currently focused element, and whether the
-// focus sits on the row's input (as opposed to its label/button).
+// The dialog row with the focus, and whether it is on the field (rather
+// than the label).
 int App::CurrentFormRow(bool* in_input) const
 {
   if (in_input)
@@ -285,11 +294,9 @@ int App::CurrentFormRow(bool* in_input) const
   return 0;
 }
 
-// Focuses the text field of a form row with all of its text selected. The
-// PS4's own keyboard adds what is typed to the text already in the field and
-// has no way to delete any of it; with the text selected, what is typed
-// replaces it instead. Nothing is removed until something is typed, so
-// dismissing the keyboard leaves the field as it was.
+// The PS4's keyboard appends to a field's text and cannot delete any of it,
+// so the text is selected: what is typed replaces it, and dismissing the
+// keyboard leaves it as it was.
 bool App::EnterFormInput(int row)
 {
   if (row < 0 || row >= kButtonRow)
@@ -300,7 +307,7 @@ bool App::EnterFormInput(int row)
     return false;
 
   el->Focus();
-  // After the focus: gaining it may place the caret and drop a selection.
+  // After the focus, which may place the caret and drop a selection.
   if (auto* input = dynamic_cast<Rml::ElementFormControlInput*>(el))
     input->Select();
   return true;
@@ -312,9 +319,7 @@ void App::FocusFormField(int delta)
   const int current = CurrentFormRow(&in_input);
   const int next = std::clamp(current + delta, 0, kFormRowCount - 1);
 
-  // From a text field, up/down goes to the neighbouring text field rather
-  // than via its label. The password field is the last one: below it comes
-  // the Save button, reached through its label slot like any other row.
+  // From a field, up/down go to the next field; below the last one is Save.
   if (in_input && current != kButtonRow)
     {
       if (next == current)
@@ -330,9 +335,8 @@ void App::FocusFormField(int delta)
     el->Focus();
 }
 
-// Right pressed: move from a label into its input. Returns false when the
-// key should instead be handled by whoever has focus (e.g. caret movement
-// inside a text input).
+// Right: from a label into its field. False when the key belongs to the
+// focused element (the caret in a field).
 bool App::FocusFormInput()
 {
   bool in_input = false;
@@ -352,9 +356,7 @@ bool App::FocusFormInput()
   return false;
 }
 
-// Left pressed: move from an input back to its label, but only when the
-// caret is already at the start of the text so left/right still work for
-// editing inside the field.
+// Left: from a field back to its label, once the caret is at the start.
 bool App::FocusFormLabel()
 {
   bool in_input = false;
@@ -383,6 +385,7 @@ bool App::FocusFormLabel()
 
 void App::HandleKeyConnect(Rml::Event& event, int key)
 {
+  CancelReconnect(); // someone is here to choose
   if (zone_ == Zone::ServerList)
     {
       switch (keymap::Command(key))
@@ -393,18 +396,17 @@ void App::HandleKeyConnect(Rml::Event& event, int key)
 	case keymap::Cmd::Down:
 	  MoveSelection(+1);
 	  break;
-	case keymap::Cmd::Options: // options / the remote's menu button
+	case keymap::Cmd::Options:
 	  OpenServerMenu();
 	  break;
-	// Shortcuts for what the Options menu offers.
-	case keymap::Cmd::Secondary: // square: edit this server
+	case keymap::Cmd::Secondary: // Options > Edit
 	  OpenServerDialog(false);
 	  break;
-	case keymap::Cmd::Remove: // triangle: delete it (after asking)
+	case keymap::Cmd::Remove: // Options > Delete
 	  DeleteSelectedServer();
 	  break;
 	case keymap::Cmd::Ok:
-	case keymap::Cmd::PlayPause: // the remote's play button connects too
+	case keymap::Cmd::PlayPause:
 	  StartConnect();
 	  break;
 	default:
@@ -414,9 +416,8 @@ void App::HandleKeyConnect(Rml::Event& event, int key)
       return;
     }
 
-  // Form zone. This is the one place with text fields, so Cmd::Back is not
-  // used here: it also covers Backspace, which has to reach the inputs.
-  // Escape alone - circle on the pad, back on the remote - closes the dialog.
+  // The dialog has text fields, so Escape alone closes it: Cmd::Back is
+  // Backspace too, which the fields need.
   if (key == Rml::Input::KI_ESCAPE)
     {
       CloseServerDialog();
@@ -437,18 +438,13 @@ void App::HandleKeyConnect(Rml::Event& event, int key)
     case Rml::Input::KI_RIGHT:
       if (FocusFormInput())
 	event.StopPropagation();
-      break; // otherwise: caret movement inside an input
+      break; // else the caret's
     case Rml::Input::KI_LEFT:
-      // Only meaningful inside a text field; the dialog is modal, so a left
-      // press on a label does nothing.
       if (FocusFormLabel())
 	event.StopPropagation();
       break;
     default:
-      // Everything else - including KI_RETURN - propagates. RmlUi's document
-      // default action clicks the focused element on Enter/Space, so the
-      // Save and Cancel buttons activate via their data-event-click handlers
-      // when focused. There is no longer a global save key.
+      // The rest goes on: Enter clicks the focused button.
       break;
     }
 }

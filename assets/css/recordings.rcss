@@ -1,7 +1,5 @@
 /*
- * Recordings list rows.
- *
- * Row height and margin are mirrored by kRecRowPitch in src/app_internal.h.
+ * The recordings. Row height + margin is kRecRowPitch (src/app_internal.h).
  */
 
 #recordings {
@@ -44,8 +42,9 @@
 }
 
 .reclogo.empty {
-	padding: 16px 0px 0px 0px;
+	padding: 0px;
 	font-size: 32px;
+	line-height: 68px;
 	text-align: center;
 	color: #ffffff2e;
 }
@@ -102,7 +101,7 @@
 	color: #ff8f6e;
 }
 
-/* Left part-way: how far, under the meta line (Tvheadend keeps it). */
+/* Left part-way: how far. */
 .recprogress {
 	display: block;
 	width: 100%;
