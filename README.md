@@ -14,7 +14,7 @@ Grab the `.pkg` from the [releases page](../../releases) and install it with
 your package installer.
 
 ## Building
-For the PS4 you'll need the
+For the PS4 (and PS5) you'll need the
 [ps4-homebrew-dev SDK](https://github.com/ps4-homebrew-dev) 0.8.7 or later.
 Then, just run:
 ```sh
