@@ -6,7 +6,7 @@ Most of the code was written with Claude.ai.
 ![tvhp](screenshot.jpg)
 
 ## Prerequisites
-- A jailbroken PS4 or PS5 that can install fake packages (`.pkg`)
+- A jailbroken PS4 or PS5 that can install and launch fake packages (`.pkg`)
 - A Tvheadend server (4.2 or newer) with an HTSP user (default port 9982)
 
 ## Install
