@@ -15,13 +15,15 @@ your package installer.
 
 ## Building
 For the PS4 you'll need the
-[ps4-homebrew-dev SDK](https://github.com/ps4-homebrew-dev) 0.8.7 or later:
+[ps4-homebrew-dev SDK](https://github.com/ps4-homebrew-dev) 0.8.7 or later.
+Then, just run:
 ```sh
 /opt/ps4-homebrew-sdk/bin/orbis-cmake -S . -B build-ps4
 make -C build-ps4
 ```
 
 On a PC, you'll need SDL2, SDL2_image, RmlUi 6.2, libmpv and libavformat.
+Then, just run:
 ```sh
 cmake -S . -B build-pc
 make -C build-pc
