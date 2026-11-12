@@ -22,7 +22,7 @@ Then, just run:
 make -C build-ps4
 ```
 
-On a PC, you'll need SDL2, SDL2_image, RmlUi 6.2, libmpv and libavformat.
+On a GNU/Linux system, you'll need SDL2, SDL2_image, RmlUi 6.2, libmpv and libavformat.
 Then, just run:
 ```sh
 cmake -S . -B build-pc
