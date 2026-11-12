@@ -5,12 +5,26 @@
 #include <cstdlib>
 #include <mutex>
 
+#include <openssl/ssl.h>
+#include <openssl/x509_vfy.h>
+
+#include "clock.h"
 #include "net/http_client.h"
 
 namespace net {
   namespace {
 
     constexpr long kConnectTimeoutMs = 10000;
+
+    // Certificates are judged by the server's clock (clock.h): by a console
+    // clock days off, valid ones look expired or not valid yet.
+    CURLcode OnSslContext(CURL*, void* ssl_ctx, void*) {
+      const int64_t skew = tvclock::skew.load();
+      if (skew < -60 || skew > 60)
+	X509_VERIFY_PARAM_set_time(SSL_CTX_get0_param((SSL_CTX*)ssl_ctx),
+				   (time_t)tvclock::Now());
+      return CURLE_OK;
+    }
 
     struct Sink {
       std::string data;
@@ -150,6 +164,9 @@ namespace net {
     ::curl_easy_setopt(curl_, CURLOPT_NOPROGRESS, 0L);
     // The worker thread must not be hit by libcurl's signal-based timeouts.
     ::curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
+
+    // OpenSSL only; others say CURLE_NOT_BUILT_IN and check by the console.
+    ::curl_easy_setopt(curl_, CURLOPT_SSL_CTX_FUNCTION, OnSslContext);
 
     // A logo has no business on file:// or scp://.
 #if LIBCURL_VERSION_NUM >= 0x075500

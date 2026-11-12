@@ -14,6 +14,7 @@ pkg_check_modules(MPV REQUIRED IMPORTED_TARGET mpv)
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavformat libavcodec libavutil)
 pkg_check_modules(SDL2_IMAGE REQUIRED IMPORTED_TARGET SDL2_image)
 pkg_check_modules(CURL REQUIRED IMPORTED_TARGET libcurl)
+pkg_check_modules(OPENSSL REQUIRED IMPORTED_TARGET openssl)
 
 add_executable(tvhp
     src/main.cpp
@@ -60,6 +61,7 @@ target_link_libraries(tvhp PRIVATE
     PkgConfig::FFMPEG
     PkgConfig::SDL2_IMAGE
     PkgConfig::CURL
+    PkgConfig::OPENSSL
     Threads::Threads
     ${CMAKE_DL_LIBS}
     hts

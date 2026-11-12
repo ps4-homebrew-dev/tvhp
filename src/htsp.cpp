@@ -13,6 +13,7 @@ extern "C" {
 }
 
 #include "htsp.h"
+#include "clock.h"
 
 namespace {
 
@@ -278,6 +279,28 @@ bool HtspClient::Connect(const std::string& host, int port, const std::string& u
       error = "Tvheadend refused the login: " + auth_error;
       return false;
     }
+
+  // The server's clock, which the guide goes by (clock.h).
+  htsmsg_t* systime = htsmsg_create_map();
+  htsmsg_add_str(systime, "method", "getSysTime");
+  seq = next_seq++;
+  htsmsg_add_u32(systime, "seq", seq);
+  if (!SendMessage(systime, error))
+    return false;
+  tvclock::skew = 0;
+  int64_t server_time = 0;
+  if ((reply = read_reply(seq, error)))
+    {
+      if (!htsmsg_get_s64(reply, "time", &server_time) && server_time > 0)
+	{
+	  const int64_t skew = server_time - (int64_t)std::time(nullptr);
+	  tvclock::skew = skew;
+	  if (skew < -60 || skew > 60)
+	    std::fprintf(stderr, "htsp: this clock is %lld s %s the server's; going by the server's\n",
+			 (long long)(skew < 0 ? -skew : skew), skew > 0 ? "behind" : "ahead of");
+	}
+      htsmsg_destroy(reply);
+    }
   return true;
 }
 
@@ -293,7 +316,7 @@ void HtspClient::StartAsync()
   htsmsg_t* msg = htsmsg_create_map();
   htsmsg_add_str(msg, "method", "enableAsyncMetadata");
   htsmsg_add_u32(msg, "epg", 1);
-  htsmsg_add_s64(msg, "epgMaxTime", (int64_t)time(nullptr) + kEpgWindowSec);
+  htsmsg_add_s64(msg, "epgMaxTime", tvclock::Now() + kEpgWindowSec);
   std::string error;
   if (htsmsg_t* reply = SendRequest(msg, kRequestTimeoutMs, error))
     htsmsg_destroy(reply);
@@ -385,7 +408,7 @@ void HtspClient::HandleAsyncMessage(htsmsg_t* msg)
     {
       std::lock_guard<std::mutex> lock(channels_mutex);
       UpsertEventLocked(msg, !std::strcmp(method, "eventUpdate"));
-      const time_t now = time(nullptr);
+      const time_t now = (time_t)tvclock::Now();
       if (now - last_prune > kPruneIntervalSec)
 	PruneExpiredLocked(now);
       generation++;
@@ -611,7 +634,7 @@ std::vector<HtspChannel> HtspClient::GetChannels() const
 std::vector<HtspEvent> HtspClient::GetChannelEvents(uint32_t channel_id, size_t max_events) const
 {
   std::vector<HtspEvent> out;
-  const time_t now = time(nullptr);
+  const time_t now = (time_t)tvclock::Now();
 
   std::lock_guard<std::mutex> lock(channels_mutex);
   auto ch = epg.find(channel_id);
@@ -632,7 +655,7 @@ std::vector<HtspEvent> HtspClient::GetChannelEvents(uint32_t channel_id, size_t 
 HtspClient::NowNext HtspClient::GetNowNext(uint32_t channel_id) const
 {
   NowNext result;
-  const time_t now = time(nullptr);
+  const time_t now = (time_t)tvclock::Now();
 
   std::lock_guard<std::mutex> lock(channels_mutex);
   auto ch = epg.find(channel_id);

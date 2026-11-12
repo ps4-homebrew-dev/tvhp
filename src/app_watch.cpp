@@ -8,6 +8,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "clock.h"
 #include "icons.h"
 #include "keymap.h"
 #include "format.h"
@@ -59,7 +60,7 @@ std::string EndsAt(int64_t pos, int64_t dur, double speed) {
   if (pos < 0 || dur < 5 * 60 * 1000000LL || pos >= dur || speed <= 0.0)
     return {};
   const std::time_t end =
-    std::time(nullptr) + (std::time_t)((double)(dur - pos) / 1e6 / speed);
+    (std::time_t)tvclock::Now() + (std::time_t)((double)(dur - pos) / 1e6 / speed);
   std::tm tm = {};
   localtime_r(&end, &tm);
   char buf[32];
@@ -111,7 +112,7 @@ void App::PlayChannel(uint32_t channel_id)
   if (sleep_end_of_programme_)
     {
       const HtspClient::NowNext nn = client_.GetNowNext(channel_id);
-      const time_t now = time(nullptr);
+      const time_t now = (time_t)tvclock::Now();
       if (nn.has_now && nn.now.stop > now)
 	sleep_at_ = Now() + (double)(nn.now.stop - now);
       else
@@ -366,7 +367,7 @@ void App::UpdateWatchOverlay()
 	    {
 	      now_title = nn.now.title;
 	      now_time = FmtRange(nn.now.start, nn.now.stop);
-	      const time_t now = time(nullptr);
+	      const time_t now = (time_t)tvclock::Now();
 	      if (nn.now.stop > nn.now.start)
 		progress = Percent(now - nn.now.start, nn.now.stop - nn.now.start);
 	    }
@@ -635,7 +636,7 @@ void App::OpenWatchMenu()
       // "End of programme" is for live TV; a recording ends anyway.
       const HtspClient::NowNext nn = recorded ? HtspClient::NowNext()
 					      : client_.GetNowNext(playing_channel_id_);
-      const time_t now = time(nullptr);
+      const time_t now = (time_t)tvclock::Now();
       const bool can_end = nn.has_now && nn.now.stop > now;
       const int count = can_end ? kSleepChoiceCount : kSleepChoiceCount - 1;
       int i = 0;

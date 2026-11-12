@@ -7,6 +7,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "clock.h"
 #include "format.h"
 #include "icons.h"
 #include "keymap.h"
@@ -342,7 +343,7 @@ void App::Update() {
   PollConnectState();
 
   {
-    const time_t now = time(nullptr);
+    const time_t now = (time_t)tvclock::Now();
     struct tm tm;
     localtime_r(&now, &tm);
     char buf[8] = {};
@@ -350,6 +351,10 @@ void App::Update() {
     if (bind_clock_ != buf) {
       bind_clock_ = buf;
       model_.DirtyVariable("clock");
+    }
+    // Its own check: the server's clock may move the date and not the time.
+    if (tm.tm_yday != clock_yday_) {
+      clock_yday_ = tm.tm_yday;
       Set(bind_date_, Rml::String(textfmt::FmtLongDate(now)), "date");
     }
   }

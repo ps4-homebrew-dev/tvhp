@@ -5,6 +5,7 @@
 
 #include "app.h"
 #include "app_internal.h"
+#include "clock.h"
 #include "format.h"
 
 using namespace appdetail;
@@ -28,7 +29,7 @@ void App::RebuildChannelRows()
   sel_channel_ = std::clamp(sel_channel_, 0, std::max(0, channel_count_ - 1));
   selected_channel_id_ = channels_.empty() ? 0 : channels_[sel_channel_].id;
 
-  const time_t now = time(nullptr);
+  const time_t now = (time_t)tvclock::Now();
   channel_rows_.clear();
   channel_rows_.reserve(channels_.size());
   for (const HtspChannel& ch : channels_)
@@ -79,7 +80,7 @@ void App::RebuildEpgRows()
       epg_events_ = client_.GetChannelEvents(ch.id, kMaxEpgRows);
     }
 
-  const time_t now = time(nullptr);
+  const time_t now = (time_t)tvclock::Now();
   std::string last_day;
   for (const HtspEvent& ev : epg_events_)
     {

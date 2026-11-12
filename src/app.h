@@ -347,6 +347,7 @@ private:
   uint64_t seen_generation_ = 0;
   double last_refresh_time_ = 0.0;
   double toast_deadline_ = 0.0;
+  int clock_yday_ = -1;       // the day the date was written for
   double info_deadline_ = 0.0; // when the info bar hides
   bool scroll_channels_pending_ = false;
   bool scroll_epg_pending_ = false;

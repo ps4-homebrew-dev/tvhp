@@ -3,6 +3,7 @@
 #include <ctime>
 
 #include "format.h"
+#include "clock.h"
 
 namespace textfmt {
 
@@ -32,7 +33,7 @@ std::string Date(const struct tm& tm, const char* weekday, const char* month) {
 } // namespace
 
 std::string FmtDay(int64_t t) {
-  const time_t now = time(nullptr);
+  const time_t now = (time_t)tvclock::Now();
   time_t tt = (time_t)t;
   struct tm tm_now, tm_ev;
   localtime_r(&now, &tm_now);
