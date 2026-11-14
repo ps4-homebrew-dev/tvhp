@@ -86,6 +86,8 @@ if(ORBIS)
         CONTENT_ID IV0000-BREW04328_00-TVHP000000000000
         CATEGORY gdc
         DOWNLOAD_DATA_SIZE 128
+        # 0x2 | 0x10000 (7 CPU mode) | 0x800000 (PS4 Pro mode)
+        ATTRIBUTE 8454146
         ASSETS sce_sys assets fonts ca-bundle.crt
         MODULES libEGL.so.1 libGL.so.1 libgallium-${EGL_VERSION}.so libvulkan.so.1
     )
