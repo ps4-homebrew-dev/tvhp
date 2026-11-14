@@ -170,6 +170,7 @@ void App::OpenServerMenu() {
     {"Edit server", nullptr, [this](int) { OpenServerDialog(false); }},
     {"Delete server", nullptr, [this](int) { DeleteSelectedServer(); }},
     {"Add a server", nullptr, [this](int) { OpenServerDialog(true); }},
+    InputTraceItem(),
   });
 }
 

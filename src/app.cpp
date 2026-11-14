@@ -3,12 +3,14 @@
 // app_recordings.cpp and app_watch.cpp.
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 
 #include "app.h"
 #include "app_internal.h"
 #include "clock.h"
 #include "format.h"
+#include "gamepad.h"
 #include "icons.h"
 #include "keymap.h"
 
@@ -24,6 +26,9 @@ bool App::Initialize(Rml::Context* context, const Options& options, std::string&
   icons_.SetRoot(options.cache_dir.empty() ? std::string() : options.cache_dir + "/icons");
   config_.Load(config_path_);
   sel_server_ = config_.LastUsed();
+
+  if (const char* trace = std::getenv("TVHP_INPUT_LOG"); trace && *trace && *trace != '0')
+    SetInputTrace(true);
 
   if (!SetupDataModel(context, error))
     return false;
@@ -59,6 +64,8 @@ bool App::Initialize(Rml::Context* context, const Options& options, std::string&
 }
 
 void App::Shutdown() {
+  gamepad::SetTrace(nullptr); // it calls back into this
+
   if (connect_thread_.joinable())
     connect_thread_.join();
 
@@ -715,6 +722,31 @@ void App::ShowToast(const std::string& text, const char* icon)
   model_.DirtyVariable("toast_icon");
 }
 
+// Every input event SDL delivers goes to the log, and each press to a toast
+// as well, whether anything reacts to it or not: what a TV remote's buttons
+// arrive as (over HDMI-CEC, say) is otherwise anyone's guess.
+void App::SetInputTrace(bool on)
+{
+  input_trace_ = on;
+  if (!on)
+    {
+      gamepad::SetTrace(nullptr);
+      return;
+    }
+  gamepad::SetTrace([this](const std::string& line, bool press) {
+    SDL_Log("input: %s", line.c_str());
+    if (press)
+      ShowToast(line, icon::kGamepad);
+  });
+}
+
+App::MenuItem App::InputTraceItem()
+{
+  return {"Show input",
+	  [this] { return std::string(input_trace_ ? "On" : "Off"); },
+	  [this](int) { SetInputTrace(!input_trace_); }};
+}
+
 // ---------------------------------------------------------------------------
 // Input
 // ---------------------------------------------------------------------------
@@ -753,6 +785,10 @@ void App::HandleKeyMain(Rml::Event& event, int key)
 	  return;
 	case keymap::Cmd::Audio:
 	  CycleAudioTrack(+1);
+	  event.StopPropagation();
+	  return;
+	case keymap::Cmd::Subtitles:
+	  CycleSubtitleTrack(+1);
 	  event.StopPropagation();
 	  return;
 	case keymap::Cmd::PlayPause:

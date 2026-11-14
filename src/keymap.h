@@ -42,7 +42,8 @@ namespace keymap {
     Back,      // Circle    | back, prev     | Escape, Backspace
     Secondary, // Square    | display        | Tab
     Remove,    // Triangle  | red            | Delete
-    Options,   // Options   | menu, context  | Insert   (or hold Cross / Enter)
+    Options,   // Options   | menu, context, | Insert   (or hold Cross / Enter)
+               //           | disc menu      |
     Guide,     // Select    | guide          | F9 (no pad button on a PS4)
 
     // A remote's transport keys; a pad does without.
@@ -53,6 +54,7 @@ namespace keymap {
     SkipBack,    // |<
     SkipForward, // >|
     Audio,       // audio: the next audio track
+    Subtitles,   // subtitle: the next subtitle track (or none)
   };
 
   constexpr Cmd Command(int key) {
@@ -84,11 +86,16 @@ namespace keymap {
 
     case Rml::Input::KI_APPS:               return Cmd::Options;
     case Rml::Input::KI_INSERT:             return Cmd::Options;
+    // An HDMI-CEC remote's disc menu key, on a remote with no options key
+    // of its own (or a TV that keeps it).
+    case Rml::Input::KI_F10:                return Cmd::Options;
 
     case Rml::Input::KI_F9:                 return Cmd::Guide;
 
     // An HDMI-CEC remote's audio key arrives as F2 (its display key as F4).
     case Rml::Input::KI_F2:                 return Cmd::Audio;
+    // Its subtitle key arrives as F1.
+    case Rml::Input::KI_F1:                 return Cmd::Subtitles;
 
     case Rml::Input::KI_SPACE:              return Cmd::PlayPause;
     case Rml::Input::KI_PAUSE:              return Cmd::PlayPause;

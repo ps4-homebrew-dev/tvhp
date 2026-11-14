@@ -187,6 +187,12 @@ private:
   void EnsureRowVisible(const char* list_id, int index, float row_pitch);
   // A notice for a few seconds, with an icon (src/icons.h) in front.
   void ShowToast(const std::string& text, const char* icon = nullptr);
+  // Options > Show input: a toast (and a log line) for every input event,
+  // also those nothing reacts to, to find out what a remote sends.
+  // TVHP_INPUT_LOG=1 turns it on from the start.
+  bool input_trace_ = false;
+  void SetInputTrace(bool on);
+  MenuItem InputTraceItem();
 
   // Back from full screen leaves the video playing behind the menus, under a
   // shade, as in Kodi; Back again, or selecting what plays, brings it back.

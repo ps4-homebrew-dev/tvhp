@@ -20,6 +20,9 @@
 #ifndef GAMEPAD_H
 #define GAMEPAD_H
 
+#include <functional>
+#include <string>
+
 #include <SDL.h>
 
 namespace Rml {
@@ -54,6 +57,16 @@ enum class Hold {
   kReplay,  // handle *press (the held-back OK) first, then it as usual
 };
 Hold HoldOk(const SDL_Event& event, SDL_Event* press);
+
+// Input tracing: with a callback set, every input event SDL delivers --
+// keys, controller and joystick buttons, hats, axes, also the ones nothing
+// reacts to -- is described to it in a line, with 'press' set for a
+// button or key going down (or an axis or hat leaving rest). nullptr ends
+// it. For finding out what a remote (over HDMI-CEC, say) sends.
+void SetTrace(std::function<void(const std::string& line, bool press)> trace);
+// Feeds one SDL event to the trace, if there is one. Call for every event,
+// before handling it.
+void Trace(const SDL_Event& event);
 
 } // namespace gamepad
 

@@ -26,6 +26,7 @@ inline constexpr const char* kScheduled = "";     // calendar-clock
 inline constexpr const char* kDelete = "";        // trash-2
 inline constexpr const char* kUnschedule = "";    // calendar-x
 inline constexpr const char* kDone = "";          // circle-check
+inline constexpr const char* kGamepad = "";       // gamepad-2
 
 } // namespace icon
 

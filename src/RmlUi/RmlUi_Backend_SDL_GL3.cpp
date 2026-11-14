@@ -358,6 +358,7 @@ bool Backend::ProcessEvents(Rml::Context* context, KeyDownCallback key_down_call
 	while (has_event)
 	{
 #if SDL_MAJOR_VERSION == 2
+		gamepad::Trace(ev); // tvhp: Options > Show input
 		SDL_Event ok_press;
 		switch (gamepad::HoldOk(ev, &ok_press))
 		{

@@ -500,13 +500,17 @@ void App::CycleSubtitleTrack(int direction)
 {
   std::vector<TrackInfo> choices = player_->SubtitleTracks();
   if (choices.empty())
-    return;
+    {
+      ShowToast("No subtitles");
+      return;
+    }
   TrackInfo off;
   off.id = -1;
   off.label = "Off";
   choices.insert(choices.begin(), off);
   const size_t next = NextTrack(choices, player_->CurrentSubtitleStream(), direction);
   PickSubtitleTrack(next == 0 ? nullptr : &choices[next]);
+  ShowToast("Subtitles: " + choices[next].label);
 }
 
 void App::ApplyPlayerPrefs()
@@ -781,6 +785,7 @@ void App::OpenOptionsMenu()
 	  items.push_back({"Watch " + ch->name, nullptr, [this, id](int) { PlayChannel(id); }});
 	}
     }
+  items.push_back(InputTraceItem());
   items.push_back({"Switch server", nullptr, [this](int) { DisconnectToLogin(); }});
   OpenContextMenu(title.empty() ? std::string("Options") : title, std::move(items));
 }
@@ -881,6 +886,11 @@ void App::HandleKeyWatch(Rml::Event& event, int key)
       return;
     case keymap::Cmd::Audio:
       CycleAudioTrack(+1);
+      ShowWatchInfo();
+      event.StopPropagation();
+      return;
+    case keymap::Cmd::Subtitles:
+      CycleSubtitleTrack(+1);
       ShowWatchInfo();
       event.StopPropagation();
       return;

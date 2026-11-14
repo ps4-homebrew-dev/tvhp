@@ -29,6 +29,11 @@ cmake -S . -B build-pc
 make -C build-pc
 ```
 
+## Troubleshooting
+If a button on your TV's remote does nothing, turn on **Show input** in the
+Options menu (or set `TVHP_INPUT_LOG=1`): every key and button is then shown
+as it arrives, and written to the log, including the ones tvhp ignores.
+
 ## Known limitations
 - No series or manual (time-based) recordings
 - No teletext subtitles
