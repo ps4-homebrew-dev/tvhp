@@ -165,6 +165,18 @@ namespace net {
     // The worker thread must not be hit by libcurl's signal-based timeouts.
     ::curl_easy_setopt(curl_, CURLOPT_NOSIGNAL, 1L);
 
+    // A client lives as long as the process, and the network under it can
+    // change in that time: a new DHCP lease, a Wi-Fi reconnect, a NAT entry
+    // that timed out overnight. Neither a name lookup nor an idle
+    // connection is trusted for long, whatever this libcurl's defaults are.
+    ::curl_easy_setopt(curl_, CURLOPT_DNS_CACHE_TIMEOUT, 60L);
+#if LIBCURL_VERSION_NUM >= 0x074100
+    ::curl_easy_setopt(curl_, CURLOPT_MAXAGE_CONN, 30L); // idle seconds
+#endif
+#if LIBCURL_VERSION_NUM >= 0x075000
+    ::curl_easy_setopt(curl_, CURLOPT_MAXLIFETIME_CONN, 300L);
+#endif
+
     // OpenSSL only; others say CURLE_NOT_BUILT_IN and check by the console.
     ::curl_easy_setopt(curl_, CURLOPT_SSL_CTX_FUNCTION, OnSslContext);
 
